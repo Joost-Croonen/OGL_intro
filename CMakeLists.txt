@@ -9,13 +9,20 @@ if (POLICY CMP0141)
   set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
 endif()
 
-project ("TestSetup")
+project ("OGL_intro")
+
+
 
 # Add source to this project's executable.
-add_executable (TestSetup "TestSetup.cpp" "TestSetup.h")
+add_executable (OGL_intro "src/main.cpp" "src/glad.c")
+target_include_directories(OGL_intro PUBLIC "inc")
+target_link_directories(OGL_intro PUBLIC "lib")
+target_link_libraries(OGL_intro glfw3.lib opengl32.lib)
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
-  set_property(TARGET TestSetup PROPERTY CXX_STANDARD 20)
+  set_property(TARGET OGL_intro PROPERTY CXX_STANDARD 20)
 endif()
+
+
 
 # TODO: Add tests and install targets if needed.
