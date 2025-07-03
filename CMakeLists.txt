@@ -14,7 +14,7 @@ project ("OGL_intro")
 
 
 # Add source to this project's executable.
-add_executable (OGL_intro "src/main.cpp" "src/glad.c")
+add_executable (OGL_intro "src/main.cpp" "src/glad.c" "src/shader.h")
 target_include_directories(OGL_intro PUBLIC "inc")
 target_link_directories(OGL_intro PUBLIC "lib")
 target_link_libraries(OGL_intro glfw3.lib opengl32.lib)
