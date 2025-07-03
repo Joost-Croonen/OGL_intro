@@ -43,7 +43,7 @@ int main(void)
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
     // Shaders
-    Shader ourShader("../../../src/shaders/vertex.vs", "../../../src/shaders/fragment.fs");
+    Shader ourShader("../../../src/shaders/vertex.vert", "../../../src/shaders/fragment.frag");
 
     // Vertex data
     float vertices[] = {
