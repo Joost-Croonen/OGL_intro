@@ -266,7 +266,7 @@ int main(void)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // Core
-        glm::vec3 lightPos(1.2f, 0.7f, -2.0f);
+        glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
         
         // Activate textures
         texture0.activate(GL_TEXTURE0);
@@ -274,16 +274,22 @@ int main(void)
 
         // activate shader and set uniforms
         cubeShader.use();
-        cubeShader.setVec3("objectColor", 1.0f, 0.5f, 0.31f);
-        cubeShader.setVec3("lightColor", 1.0f, 1.0f, 1.0f);
-        cubeShader.setVec3("light.position", lightPos);
         cubeShader.setVec3("viewPos", camera.Position);
+
         cubeShader.setInt("material.diffuse", 0);
         cubeShader.setInt("material.specular", 1);
         cubeShader.setFloat("material.shininess", 32.0f);
-        cubeShader.setVec3("light.ambient", 0.2f, 0.2f, 0.2f);
-        cubeShader.setVec3("light.diffuse", 0.5f, 0.5f, 0.5f); // darken diffuse light a bit
+
+        cubeShader.setVec3("light.ambient", 0.1f, 0.1f, 0.1f);
+        cubeShader.setVec3("light.diffuse", 0.8f, 0.8f, 0.8f);
         cubeShader.setVec3("light.specular", 1.0f, 1.0f, 1.0f);
+        cubeShader.setFloat("light.constant", 1.0f);
+        cubeShader.setFloat("light.linear", 0.09f);
+        cubeShader.setFloat("light.quadratic", 0.032f);
+        cubeShader.setVec3("light.position", camera.Position);
+        cubeShader.setVec3("light.direction", camera.Front);
+        cubeShader.setFloat("light.cutOff", glm::cos(glm::radians(12.5f)));
+        cubeShader.setFloat("light.outerCutOff", glm::cos(glm::radians(17.5f)));
 
         // pass projection matrix to shader (note that in this case it could change every frame)
         glm::mat4 projection = glm::perspective(glm::radians(camera.Fov), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -291,25 +297,37 @@ int main(void)
         // camera/view transformation
         glm::mat4 view = camera.GetViewMatrix();
         cubeShader.setMat4("view", view);
-        // model matrix
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0.0, 1.0, 0.0));
-        cubeShader.setMat4("model", model);
-
-        // render boxes
+        // // model matrix
+        // glm::mat4 model = glm::mat4(1.0f);
+        // model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0.0, 1.0, 0.0));
+        // cubeShader.setMat4("model", model);
         glBindVertexArray(cubeVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+        for (unsigned int i = 0; i < 10; i++)
+        {
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, cubePositions[i]);
+            float angle = 20.0f * i;
+            model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
+            cubeShader.setMat4("model", model);
 
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
+        
+        
+        // render boxes
+        // glDrawArrays(GL_TRIANGLES, 0, 36);
+        /*
         lightShader.use();
         lightShader.setMat4("projection", projection);
         lightShader.setMat4("view", view);
         
-        model = glm::mat4(1.0f);
+        glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, lightPos);
-        model = glm::scale(model, glm::vec3(0.9f));
+        model = glm::scale(model, glm::vec3(0.2f));
         lightShader.setMat4("model", model);
         glBindVertexArray(lightVAO);
         glDrawArrays(GL_TRIANGLES, 0, 36);
+        */
 
         //glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
