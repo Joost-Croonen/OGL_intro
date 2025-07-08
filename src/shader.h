@@ -51,8 +51,6 @@ public:
 		// 2. Compile shaders
 		// init
 		unsigned int vertexShader, fragmentShader;
-		int success;
-		char infoLog[512];
 		// compile and verify vertex shader
 		vertexShader = glCreateShader(GL_VERTEX_SHADER);
 		glShaderSource(vertexShader, 1, &vShaderCode, NULL);
