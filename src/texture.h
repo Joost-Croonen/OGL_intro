@@ -32,7 +32,6 @@ unsigned int TextureFromFile(const char* path, const std::string &dir) {
             format = GL_RGB;
         else if (nrChannels == 4)
             format = GL_RGBA;
-
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
 
@@ -46,7 +45,7 @@ unsigned int TextureFromFile(const char* path, const std::string &dir) {
         std::cout << "Texture failed to load at path: " << filename << std::endl;
     }
     // Memory cleanup
-    glActiveTexture(GL_TEXTURE0);
+    // glActiveTexture(GL_TEXTURE0);
     stbi_image_free(data);
     return id;
 }

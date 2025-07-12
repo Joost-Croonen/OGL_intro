@@ -8,6 +8,7 @@
 
 #include <iostream>
 #include <vector>
+#include <map>
 
 #include "shader.h"
 #include "camera.h"
@@ -79,15 +80,37 @@ int main(void)
 
     // Vertices
     float planeVertices[] = {
-        // positions            normas                texture Coords (note we set these higher than 1 (together with GL_REPEAT as texture wrapping mode). this will cause the floor texture to repeat)
+        // positions            normals               texture Coords (note we set these higher than 1 (together with GL_REPEAT as texture wrapping mode). this will cause the floor texture to repeat)
          5.0f, -0.5f,  5.0f,    0.0f, 1.0f, 0.0f,     2.0f, 0.0f,
+        -5.0f, -0.5f, -5.0f,    0.0f, 1.0f, 0.0f,     0.0f, 2.0f,
         -5.0f, -0.5f,  5.0f,    0.0f, 1.0f, 0.0f,     0.0f, 0.0f,
-        -5.0f, -0.5f, -5.0f,    0.0f, 1.0f, 0.0f,     0.0f, 2.0f,
-  
+
          5.0f, -0.5f,  5.0f,    0.0f, 1.0f, 0.0f,     2.0f, 0.0f,
-        -5.0f, -0.5f, -5.0f,    0.0f, 1.0f, 0.0f,     0.0f, 2.0f,
-         5.0f, -0.5f, -5.0f,    0.0f, 1.0f, 0.0f,     2.0f, 2.0f
+         5.0f, -0.5f, -5.0f,    0.0f, 1.0f, 0.0f,     2.0f, 2.0f,
+        -5.0f, -0.5f, -5.0f,    0.0f, 1.0f, 0.0f,     0.0f, 2.0f
     };
+    float quadVertices[] = {
+        // positions           texture Coords (note we set these higher than 1 (together with GL_REPEAT as texture wrapping mode). this will cause the floor texture to repeat)
+         0.0f,  0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    0.0f, 1.0f,
+         0.0f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    0.0f, 0.0f,
+         1.0f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    1.0f, 0.0f,
+
+         0.0f,  0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    0.0f, 1.0f,
+         1.0f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    1.0f, 0.0f,
+         1.0f,  0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    1.0f, 1.0f
+    };
+
+    unsigned int quadIndices[] = {
+        1, 2, 3,
+        1, 3, 4
+    };
+
+    std::vector<glm::vec3> vegetation;
+    vegetation.push_back(glm::vec3(-1.5f, 0.0f, -0.48f));
+    vegetation.push_back(glm::vec3(1.5f, 0.0f, 0.51f));
+    vegetation.push_back(glm::vec3(0.0f, 0.0f, 0.7f));
+    vegetation.push_back(glm::vec3(-0.3f, 0.0f, -2.3f));
+    vegetation.push_back(glm::vec3(0.5f, 0.0f, -0.6f));
 
     // plane VAO
     unsigned int planeVAO, planeVBO;
@@ -104,24 +127,48 @@ int main(void)
     glEnableVertexAttribArray(2);
     glBindVertexArray(0);
 
+    // quad VAO
+    unsigned int quadVAO, quadVBO;
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &quadVBO);
+    glBindVertexArray(quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    glBindVertexArray(0);
+
     // Shaders
     Shader ourShader("../../../src/shaders/vertex.vert", "../../../src/shaders/fragment.frag");
     Shader outlineShader("../../../src/shaders/outline.vert", "../../../src/shaders/outline.frag");
+    Shader simpleShader("../../../src/shaders/simple.vert", "../../../src/shaders/simple.frag");
     
     // Model
     Model ourModel("../../../src/models/backpack/backpack.obj");
 
     // Load other textures
     unsigned int floorTexture = TextureFromFile("marble.jpg", "../../../src/textures");
-
+    unsigned int grassTexture = TextureFromFile("grass.png", "../../../src/textures");
+    unsigned int windowTexture = TextureFromFile("window.png", "../../../src/textures");
     // Enable depht test
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
+
+    // Face culling
+    glEnable(GL_CULL_FACE);
 
     // Enable stencil testing
     glEnable(GL_STENCIL_TEST);
     glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
     glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    // Enable blending
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     // Enable wireframe mode
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -140,15 +187,25 @@ int main(void)
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
+        // pass projection matrix to shader (note that in this case it could change every frame)
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Fov), (float)SCR_WIDTH / (float)SCR_HEIGHT, NEAR_PLANE, FAR_PLANE);
+        //ourShader.setMat4("projection", projection);
+        // camera/view transformation
+        glm::mat4 view = camera.GetViewMatrix();
+        //ourShader.setMat4("view", view);
+        // model matrix
+        glm::mat4 model = glm::mat4(1.0f);
+
+        
         // activate shader and set uniforms
         ourShader.use();
         // viewpos
         ourShader.setVec3("viewPos", camera.Position);
-
         // material
-        //ourShader.setInt("material.diffuse", 0);
-        //ourShader.setInt("material.specular", 1);
         ourShader.setFloat("material.shininess", 32.0f);
+
+        ourShader.setMat4("projection", projection);
+        ourShader.setMat4("view", view);
 
         glm::vec3 pointLightPositions[] = {
             glm::vec3(0.7f,  0.2f,  2.0f),
@@ -156,11 +213,13 @@ int main(void)
             glm::vec3(-4.0f,  2.0f, -12.0f),
             glm::vec3(0.0f,  0.0f, -3.0f)
         };
+        // Lights
+        {
         // dir light
         ourShader.setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
         ourShader.setVec3("dirLight.ambient", 0.0f, 0.0f, 0.0f);
-        ourShader.setVec3("dirLight.diffuse", 0.0f, 0.0f, 0.0f);
-        ourShader.setVec3("dirLight.specular", 0.0f, 0.0f, 0.0f);
+        ourShader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
+        ourShader.setVec3("dirLight.specular", 0.4f, 0.4f, 0.4f);
         // point lights
         ourShader.setVec3("pointLights[0].position", pointLightPositions[0]);
         ourShader.setVec3("pointLights[0].ambient", 0.05f, 0.05f, 0.05f);
@@ -205,63 +264,79 @@ int main(void)
         ourShader.setVec3("spotLight.direction", camera.Front);
         ourShader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
         ourShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(17.5f)));
+        }
         
-        // pass projection matrix to shader (note that in this case it could change every frame)
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Fov), (float)SCR_WIDTH / (float)SCR_HEIGHT, NEAR_PLANE, FAR_PLANE);
-        ourShader.setMat4("projection", projection);
-        // camera/view transformation
-        glm::mat4 view = camera.GetViewMatrix();
-        ourShader.setMat4("view", view);
-        
-        
-        // floor
-        // model matrix
-        glm::mat4 model = glm::mat4(1.0f);
-        ourShader.setMat4("model", model);
-        ourShader.setInt("texture_diffuse0", 0);
-        glStencilMask(0x00);
-        glBindVertexArray(planeVAO);
-        glBindTexture(GL_TEXTURE_2D, floorTexture);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        glBindVertexArray(0);
-        
+
         // 1st pass backpack
-        // model matrix
         model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(0.0f, 0.5f, 0.0f)); // translate it down so it's at the center of the scene
         model = glm::scale(model, glm::vec3(0.5f, 0.5f, 0.5f));	// it's a bit too big for our scene, so scale it down
         ourShader.setMat4("model", model);
 
-        glStencilFunc(GL_ALWAYS, 1, 0xFF);
-        glStencilMask(0xFF);
-
+        //glStencilFunc(GL_ALWAYS, 1, 0xFF);
+        //glStencilMask(0xFF);
+        glStencilMask(0x00);
         ourModel.Draw(ourShader);
 
+        // floor
+        model = glm::mat4(1.0f);
+        ourShader.setMat4("model", model);
+        glStencilMask(0x00);
+        glBindVertexArray(planeVAO);
+        glActiveTexture(GL_TEXTURE0);
+        ourShader.setInt("material.texture_diffuse1", 0);
+        glBindTexture(GL_TEXTURE_2D, floorTexture);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindVertexArray(0);
+
+        // Grass
+        simpleShader.use();
+        glStencilMask(0x00);
+        glBindVertexArray(quadVAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, windowTexture);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        simpleShader.setInt("texture_diffuse1", 0);
+        simpleShader.setMat4("projection", projection);
+        simpleShader.setMat4("view", view);
+
+        std::map<float, glm::vec3> sorted;
+        for (unsigned int i = 0; i < vegetation.size(); i++)
+        {
+            float distance = glm::length(camera.Position - vegetation[i]);
+            sorted[distance] = vegetation[i];
+        }
+
+        for (std::map<float, glm::vec3>::reverse_iterator it = sorted.rbegin(); it != sorted.rend(); ++it)
+        {
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, it->second);
+            simpleShader.setMat4("model", model);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            //glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        }
+        glBindVertexArray(0);
+
+        /*
         //2nd pass backpack outline
         outlineShader.use();
         outlineShader.setFloat("outlineScale", 0.2);
         outlineShader.setMat4("projection", projection);
         outlineShader.setMat4("view", view);
         outlineShader.setMat4("model", model);
-
+        
         glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
         glStencilMask(0x00);
         glDisable(GL_DEPTH_TEST);
-
+        
         ourModel.Draw(outlineShader);
-
+        
         glBindVertexArray(0);
         glStencilMask(0xFF);
         glStencilFunc(GL_ALWAYS, 0, 0xFF);
         glEnable(GL_DEPTH_TEST);
-
-
-
-
-
-
-
-        // draw
+        */
 
         // Swap buffers and poll for IO events
         glfwSwapBuffers(window); 
