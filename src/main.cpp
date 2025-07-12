@@ -10,6 +10,9 @@
 #include <vector>
 #include <map>
 
+#include "vbo.h"
+#include "ebo.h"
+#include "vao.h"
 #include "shader.h"
 #include "camera.h"
 #include "texture.h"
@@ -81,15 +84,20 @@ int main(void)
     // Vertices
     float planeVertices[] = {
         // positions            normals               texture Coords (note we set these higher than 1 (together with GL_REPEAT as texture wrapping mode). this will cause the floor texture to repeat)
-         5.0f, -0.5f,  5.0f,    0.0f, 1.0f, 0.0f,     2.0f, 0.0f,
-        -5.0f, -0.5f, -5.0f,    0.0f, 1.0f, 0.0f,     0.0f, 2.0f,
-        -5.0f, -0.5f,  5.0f,    0.0f, 1.0f, 0.0f,     0.0f, 0.0f,
-
-         5.0f, -0.5f,  5.0f,    0.0f, 1.0f, 0.0f,     2.0f, 0.0f,
-         5.0f, -0.5f, -5.0f,    0.0f, 1.0f, 0.0f,     2.0f, 2.0f,
-        -5.0f, -0.5f, -5.0f,    0.0f, 1.0f, 0.0f,     0.0f, 2.0f
+         5.0f, -0.5f, -5.0f,    0.0f, 1.0f, 0.0f,     2.0f, 0.0f,
+        -5.0f, -0.5f, -5.0f,    0.0f, 1.0f, 0.0f,     0.0f, 0.0f,
+        -5.0f, -0.5f,  5.0f,    0.0f, 1.0f, 0.0f,     0.0f, 2.0f,
+         5.0f, -0.5f,  5.0f,    0.0f, 1.0f, 0.0f,     2.0f, 2.0f
     };
+
     float quadVertices[] = {
+        // positions           texture Coords (note we set these higher than 1 (together with GL_REPEAT as texture wrapping mode). this will cause the floor texture to repeat)
+         0.0f,  0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    0.0f, 1.0f,
+         0.0f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    0.0f, 0.0f,
+         1.0f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    1.0f, 0.0f,
+         1.0f,  0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    1.0f, 1.0f
+    };
+    float screenVertices[] = {
         // positions           texture Coords (note we set these higher than 1 (together with GL_REPEAT as texture wrapping mode). this will cause the floor texture to repeat)
          0.0f,  0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    0.0f, 1.0f,
          0.0f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    0.0f, 0.0f,
@@ -100,9 +108,10 @@ int main(void)
          1.0f,  0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    1.0f, 1.0f
     };
 
-    unsigned int quadIndices[] = {
-        1, 2, 3,
-        1, 3, 4
+
+    unsigned int indices[] = {
+        0, 1, 2,
+        0, 2, 3
     };
 
     std::vector<glm::vec3> vegetation;
@@ -113,34 +122,24 @@ int main(void)
     vegetation.push_back(glm::vec3(0.5f, 0.0f, -0.6f));
 
     // plane VAO
-    unsigned int planeVAO, planeVBO;
-    glGenVertexArrays(1, &planeVAO);
-    glGenBuffers(1, &planeVBO);
-    glBindVertexArray(planeVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(planeVertices), &planeVertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-    glBindVertexArray(0);
+    VAO planeVAO = VAO();
+    VBO planeVBO = VBO(planeVertices, sizeof(planeVertices));
+    EBO planeEBO = EBO(indices, sizeof(indices));
+    planeVAO.bind();
+    planeVAO.linkVBO(planeVBO);
+    planeVAO.linkEBO(planeEBO);
+    planeVAO.setAttributes();
+    planeVAO.unbind();
 
     // quad VAO
-    unsigned int quadVAO, quadVBO;
-    glGenVertexArrays(1, &quadVAO);
-    glGenBuffers(1, &quadVBO);
-    glBindVertexArray(quadVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-    glBindVertexArray(0);
+    VAO quadVAO = VAO();
+    VBO quadVBO = VBO(quadVertices, sizeof(quadVertices));
+    EBO quadEBO = EBO(indices, sizeof(indices));
+    quadVAO.bind();
+    quadVAO.linkVBO(quadVBO);
+    quadVAO.linkEBO(quadEBO);
+    quadVAO.setAttributes();
+    quadVAO.unbind();
 
     // Shaders
     Shader ourShader("../../../src/shaders/vertex.vert", "../../../src/shaders/fragment.frag");
@@ -151,15 +150,21 @@ int main(void)
     Model ourModel("../../../src/models/backpack/backpack.obj");
 
     // Load other textures
-    unsigned int floorTexture = TextureFromFile("marble.jpg", "../../../src/textures");
-    unsigned int grassTexture = TextureFromFile("grass.png", "../../../src/textures");
-    unsigned int windowTexture = TextureFromFile("window.png", "../../../src/textures");
+    Texture_class floorTex = Texture_class("../../../src/textures/marble.jpg",
+        GL_REPEAT, GL_REPEAT, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
+    Texture_class grassTex = Texture_class("../../../src/textures/grass.png",
+        GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
+    Texture_class windowTex = Texture_class("../../../src/textures/window.png",
+        GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
+
     // Enable depht test
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
     // Face culling
     glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
 
     // Enable stencil testing
     glEnable(GL_STENCIL_TEST);
@@ -282,22 +287,17 @@ int main(void)
         model = glm::mat4(1.0f);
         ourShader.setMat4("model", model);
         glStencilMask(0x00);
-        glBindVertexArray(planeVAO);
-        glActiveTexture(GL_TEXTURE0);
-        ourShader.setInt("material.texture_diffuse1", 0);
-        glBindTexture(GL_TEXTURE_2D, floorTexture);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        planeVAO.bind();
+        floorTex.activate(ourShader, "material.texture_diffuse1", 0);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        //glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
 
         // Grass
         simpleShader.use();
         glStencilMask(0x00);
-        glBindVertexArray(quadVAO);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, windowTexture);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        simpleShader.setInt("texture_diffuse1", 0);
+        quadVAO.bind();
+        grassTex.activate(simpleShader, "texture_diffuse1", 0);
         simpleShader.setMat4("projection", projection);
         simpleShader.setMat4("view", view);
 
@@ -313,8 +313,7 @@ int main(void)
             model = glm::mat4(1.0f);
             model = glm::translate(model, it->second);
             simpleShader.setMat4("model", model);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            //glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         }
         glBindVertexArray(0);
 

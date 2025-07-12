@@ -58,11 +58,9 @@ public:
     GLint wrap_t;
     GLint min_filt;
     GLint mag_filt;
-    GLenum data_format;
 
-    Texture_class(const char* path, GLenum dataformat, GLint wraps, GLint wrapt, GLint minfilt, GLint magfilt) : 
+    Texture_class(const char* path, GLint wraps, GLint wrapt, GLint minfilt, GLint magfilt) : 
         albedoPath(path), 
-        data_format(dataformat), 
         wrap_s(wraps), 
         wrap_t(wrapt), 
         min_filt(minfilt), 
@@ -82,7 +80,14 @@ public:
         data = stbi_load(albedoPath, &width, &height, &nrChannels, 0);
         // Create texture and generate mipmaps for currently bound texture
         if (data) {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, data_format, GL_UNSIGNED_BYTE, data);
+            GLenum format;
+            if (nrChannels == 1)
+                format = GL_RED;
+            else if (nrChannels == 3)
+                format = GL_RGB;
+            else if (nrChannels == 4)
+                format = GL_RGBA;
+            glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
             glGenerateMipmap(GL_TEXTURE_2D);
         }
         else {
@@ -93,10 +98,11 @@ public:
         glActiveTexture(GL_TEXTURE0);
 	}
 
-    void activate(GLenum texture_unit)
+    void activate(Shader shader, const char* name, GLenum texture_unit)
     {
         glActiveTexture(texture_unit);
         glBindTexture(GL_TEXTURE_2D, id);
+        shader.setInt(name, texture_unit);
     }
 
 private:
