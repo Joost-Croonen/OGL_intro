@@ -150,12 +150,14 @@ int main(void)
     Model ourModel("../../../src/models/backpack/backpack.obj");
 
     // Load other textures
-    Texture_class floorTex = Texture_class("../../../src/textures/marble.jpg",
+    Texture floorTexture = Texture("../../../src/textures/marble.jpg",
         GL_REPEAT, GL_REPEAT, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
-    Texture_class grassTex = Texture_class("../../../src/textures/grass.png",
+    Texture grassTexture = Texture("../../../src/textures/grass.png",
         GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
-    Texture_class windowTex = Texture_class("../../../src/textures/window.png",
+    Texture windowTexture = Texture("../../../src/textures/window.png",
         GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
+
+    Texture bufferTexture = Texture(SCR_WIDTH, SCR_HEIGHT, GL_RGB);
 
     // Enable depht test
     glEnable(GL_DEPTH_TEST);
@@ -201,7 +203,7 @@ int main(void)
         // model matrix
         glm::mat4 model = glm::mat4(1.0f);
 
-        
+
         // activate shader and set uniforms
         ourShader.use();
         // viewpos
@@ -288,7 +290,7 @@ int main(void)
         ourShader.setMat4("model", model);
         glStencilMask(0x00);
         planeVAO.bind();
-        floorTex.activate(ourShader, "material.texture_diffuse1", 0);
+        floorTexture.activate(ourShader, "material.texture_diffuse1", 0);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         //glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
@@ -297,7 +299,7 @@ int main(void)
         simpleShader.use();
         glStencilMask(0x00);
         quadVAO.bind();
-        grassTex.activate(simpleShader, "texture_diffuse1", 0);
+        grassTexture.activate(simpleShader, "texture_diffuse1", 0);
         simpleShader.setMat4("projection", projection);
         simpleShader.setMat4("view", view);
 
