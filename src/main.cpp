@@ -13,6 +13,8 @@
 #include "vbo.h"
 #include "ebo.h"
 #include "vao.h"
+#include "fbo.h"
+#include "rbo.h"
 #include "shader.h"
 #include "camera.h"
 #include "texture.h"
@@ -91,23 +93,19 @@ int main(void)
     };
 
     float quadVertices[] = {
-        // positions           texture Coords (note we set these higher than 1 (together with GL_REPEAT as texture wrapping mode). this will cause the floor texture to repeat)
+        // positions          normals              texture Coords (note we set these higher than 1 (together with GL_REPEAT as texture wrapping mode). this will cause the floor texture to repeat)
          0.0f,  0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    0.0f, 1.0f,
          0.0f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    0.0f, 0.0f,
          1.0f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    1.0f, 0.0f,
          1.0f,  0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    1.0f, 1.0f
     };
     float screenVertices[] = {
-        // positions           texture Coords (note we set these higher than 1 (together with GL_REPEAT as texture wrapping mode). this will cause the floor texture to repeat)
-         0.0f,  0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    0.0f, 1.0f,
-         0.0f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    0.0f, 0.0f,
-         1.0f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    1.0f, 0.0f,
-
-         0.0f,  0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    0.0f, 1.0f,
-         1.0f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    1.0f, 0.0f,
-         1.0f,  0.5f, 0.0f,   0.0f, 0.0f, 1.0f,    1.0f, 1.0f
+        // positions          texture Coords (note we set these higher than 1 (together with GL_REPEAT as texture wrapping mode). this will cause the floor texture to repeat)
+        -1.0f,  1.0f, 0.0f,   0.0f, 1.0f,
+        -1.0f, -1.0f, 0.0f,   0.0f, 0.0f,
+         1.0f, -1.0f, 0.0f,   1.0f, 0.0f,
+         1.0f,  1.0f, 0.0f,   1.0f, 1.0f
     };
-
 
     unsigned int indices[] = {
         0, 1, 2,
@@ -141,11 +139,22 @@ int main(void)
     quadVAO.setAttributes();
     quadVAO.unbind();
 
+    // screen VAO
+    VAO screenVAO = VAO();
+    VBO screenVBO = VBO(screenVertices, sizeof(screenVertices));
+    EBO screenEBO = EBO(indices, sizeof(indices));
+    screenVAO.bind();
+    screenVAO.linkVBO(screenVBO);
+    screenVAO.linkEBO(screenEBO);
+    screenVAO.setAttributes(false);
+    screenVAO.unbind();
+
     // Shaders
     Shader ourShader("../../../src/shaders/vertex.vert", "../../../src/shaders/fragment.frag");
     Shader outlineShader("../../../src/shaders/outline.vert", "../../../src/shaders/outline.frag");
     Shader simpleShader("../../../src/shaders/simple.vert", "../../../src/shaders/simple.frag");
-    
+    Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/texture.frag");
+
     // Model
     Model ourModel("../../../src/models/backpack/backpack.obj");
 
@@ -157,7 +166,17 @@ int main(void)
     Texture windowTexture = Texture("../../../src/textures/window.png",
         GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
 
+    // Render to texture
+    FBO fbo = FBO();
+    fbo.bind();
     Texture bufferTexture = Texture(SCR_WIDTH, SCR_HEIGHT, GL_RGB);
+    bufferTexture.attach(GL_COLOR_ATTACHMENT0);
+    RBO rbo = RBO(SCR_WIDTH, SCR_HEIGHT, GL_DEPTH24_STENCIL8);
+    rbo.bind();
+    rbo.attach(GL_DEPTH_STENCIL_ATTACHMENT);
+    //rbo.unbind();
+    fbo.check_status();
+    fbo.unbind();
 
     // Enable depht test
     glEnable(GL_DEPTH_TEST);
@@ -169,16 +188,16 @@ int main(void)
     glFrontFace(GL_CCW);
 
     // Enable stencil testing
-    glEnable(GL_STENCIL_TEST);
-    glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
-    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+    // glEnable(GL_STENCIL_TEST);
+    // glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    // glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
 
     // Enable blending
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     // Enable wireframe mode
-    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     // Main render loop
     while (!glfwWindowShouldClose(window)) 
@@ -190,9 +209,14 @@ int main(void)
         // Inputs
         processInput(window);
 
+        // First pass to texture
+        fbo.bind();
+        glEnable(GL_DEPTH_TEST);
+
         // Rendering
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
 
         // pass projection matrix to shader (note that in this case it could change every frame)
         glm::mat4 projection = glm::perspective(glm::radians(camera.Fov), (float)SCR_WIDTH / (float)SCR_HEIGHT, NEAR_PLANE, FAR_PLANE);
@@ -202,7 +226,6 @@ int main(void)
         //ourShader.setMat4("view", view);
         // model matrix
         glm::mat4 model = glm::mat4(1.0f);
-
 
         // activate shader and set uniforms
         ourShader.use();
@@ -282,22 +305,22 @@ int main(void)
 
         //glStencilFunc(GL_ALWAYS, 1, 0xFF);
         //glStencilMask(0xFF);
-        glStencilMask(0x00);
+        //glStencilMask(0x00);
         ourModel.Draw(ourShader);
 
         // floor
         model = glm::mat4(1.0f);
         ourShader.setMat4("model", model);
-        glStencilMask(0x00);
+        //glStencilMask(0x00);
         planeVAO.bind();
         floorTexture.activate(ourShader, "material.texture_diffuse1", 0);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         //glDrawArrays(GL_TRIANGLES, 0, 6);
-        glBindVertexArray(0);
+        planeVAO.unbind();
 
         // Grass
         simpleShader.use();
-        glStencilMask(0x00);
+        //glStencilMask(0x00);
         quadVAO.bind();
         grassTexture.activate(simpleShader, "texture_diffuse1", 0);
         simpleShader.setMat4("projection", projection);
@@ -317,7 +340,7 @@ int main(void)
             simpleShader.setMat4("model", model);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         }
-        glBindVertexArray(0);
+        quadVAO.unbind();
 
         /*
         //2nd pass backpack outline
@@ -339,10 +362,33 @@ int main(void)
         glEnable(GL_DEPTH_TEST);
         */
 
+        // 2nd pass to draw render texture to screen quad
+        fbo.unbind();
+        glDisable(GL_DEPTH_TEST);
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        screenShader.use();
+        screenVAO.bind();
+        bufferTexture.activate(screenShader, "screenTexture", 0);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
         // Swap buffers and poll for IO events
         glfwSwapBuffers(window); 
         glfwPollEvents();
     }
+
+    planeVAO.Delete();
+    quadVAO.Delete();
+    //screenVAO.Delete();
+    planeVBO.Delete();
+    quadVBO.Delete();
+    //screenVBO.Delete();
+    planeEBO.Delete();
+    quadEBO.Delete();
+    //screenEBO.Delete();
+    rbo.Delete();
+    fbo.Delete();
     // Terminate GLFW
     glfwTerminate();
     return 0;

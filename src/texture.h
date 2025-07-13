@@ -93,7 +93,7 @@ public:
 	}
 
     Texture(unsigned int width, unsigned int height, GLenum format, 
-        GLint min_filt=GL_LINEAR_MIPMAP_LINEAR, GLint mag_filt=GL_LINEAR) :
+        GLint min_filt=GL_LINEAR, GLint mag_filt=GL_LINEAR) :
         albedoPath(""), width(width), height(height)
     {
         glGenTextures(1, &id);
@@ -110,9 +110,9 @@ public:
         shader.setInt(name, texture_unit);
     }
 
-    void attach() const
+    void attach(GLenum type) const
     {
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, id, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, type, GL_TEXTURE_2D, id, 0);
     }
 
 private:
