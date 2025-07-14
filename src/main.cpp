@@ -153,7 +153,7 @@ int main(void)
     Shader ourShader("../../../src/shaders/vertex.vert", "../../../src/shaders/fragment.frag");
     Shader outlineShader("../../../src/shaders/outline.vert", "../../../src/shaders/outline.frag");
     Shader simpleShader("../../../src/shaders/simple.vert", "../../../src/shaders/simple.frag");
-    Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/texture.frag");
+    Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/screen.frag");
 
     // Model
     Model ourModel("../../../src/models/backpack/backpack.obj");
