@@ -31,6 +31,7 @@ const unsigned int SCR_WIDTH = 2560;
 const unsigned int SCR_HEIGHT = 1440;
 const float NEAR_PLANE = 0.1;
 const float FAR_PLANE = 100;
+bool zoom = false;
 
 // camera
 Camera camera(glm::vec3(1.0f, 1.5f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -100, -20);
@@ -101,10 +102,10 @@ int main(void)
     };
     float screenVertices[] = {
         // positions          texture Coords (note we set these higher than 1 (together with GL_REPEAT as texture wrapping mode). this will cause the floor texture to repeat)
-        -1.0f,  1.0f, 0.0f,   0.0f, 1.0f,
-        -1.0f, -1.0f, 0.0f,   0.0f, 0.0f,
-         1.0f, -1.0f, 0.0f,   1.0f, 0.0f,
-         1.0f,  1.0f, 0.0f,   1.0f, 1.0f
+        -1.0f / 2.0f,  1.0f / 2.0f, 0.0f,   0.0f, 1.0f,
+        -1.0f / 2.0f, -1.0f / 2.0f, 0.0f,   0.0f, 0.0f,
+         1.0f / 2.0f, -1.0f / 2.0f, 0.0f,   1.0f, 0.0f,
+         1.0f / 2.0f,  1.0f / 2.0f, 0.0f,   1.0f, 1.0f
     };
 
     unsigned int indices[] = {
@@ -169,9 +170,9 @@ int main(void)
     // Render to texture
     FBO fbo = FBO();
     fbo.bind();
-    Texture bufferTexture = Texture(SCR_WIDTH, SCR_HEIGHT, GL_RGB);
+    Texture bufferTexture = Texture(SCR_WIDTH / 2.0, SCR_HEIGHT / 2.0, GL_RGB);
     bufferTexture.attach(GL_COLOR_ATTACHMENT0);
-    RBO rbo = RBO(SCR_WIDTH, SCR_HEIGHT, GL_DEPTH24_STENCIL8);
+    RBO rbo = RBO(SCR_WIDTH / 2.0, SCR_HEIGHT / 2.0, GL_DEPTH24_STENCIL8);
     rbo.bind();
     rbo.attach(GL_DEPTH_STENCIL_ATTACHMENT);
     //rbo.unbind();
@@ -188,9 +189,9 @@ int main(void)
     glFrontFace(GL_CCW);
 
     // Enable stencil testing
-    // glEnable(GL_STENCIL_TEST);
-    // glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
-    // glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+    glEnable(GL_STENCIL_TEST);
+    glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
 
     // Enable blending
     glEnable(GL_BLEND);
@@ -209,21 +210,19 @@ int main(void)
         // Inputs
         processInput(window);
 
+        // Rendering
         // First pass to texture
         fbo.bind();
+        glViewport(0, 0, SCR_WIDTH / 2.0, SCR_HEIGHT / 2.0);
         glEnable(GL_DEPTH_TEST);
-
-        // Rendering
+        
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+        
         // pass projection matrix to shader (note that in this case it could change every frame)
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Fov), (float)SCR_WIDTH / (float)SCR_HEIGHT, NEAR_PLANE, FAR_PLANE);
-        //ourShader.setMat4("projection", projection);
+        glm::mat4 projection = glm::perspective(glm::radians(15.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, NEAR_PLANE, FAR_PLANE);
         // camera/view transformation
         glm::mat4 view = camera.GetViewMatrix();
-        //ourShader.setMat4("view", view);
         // model matrix
         glm::mat4 model = glm::mat4(1.0f);
 
@@ -244,7 +243,6 @@ int main(void)
             glm::vec3(0.0f,  0.0f, -3.0f)
         };
         // Lights
-        {
         // dir light
         ourShader.setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
         ourShader.setVec3("dirLight.ambient", 0.0f, 0.0f, 0.0f);
@@ -294,8 +292,7 @@ int main(void)
         ourShader.setVec3("spotLight.direction", camera.Front);
         ourShader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
         ourShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(17.5f)));
-        }
-        
+
 
         // 1st pass backpack
         model = glm::mat4(1.0f);
@@ -304,14 +301,14 @@ int main(void)
         ourShader.setMat4("model", model);
 
         //glStencilFunc(GL_ALWAYS, 1, 0xFF);
-        //glStencilMask(0xFF);
-        //glStencilMask(0x00);
+        glStencilMask(0xFF);
+        glStencilMask(0x00);
         ourModel.Draw(ourShader);
 
         // floor
         model = glm::mat4(1.0f);
         ourShader.setMat4("model", model);
-        //glStencilMask(0x00);
+        glStencilMask(0x00);
         planeVAO.bind();
         floorTexture.activate(ourShader, "material.texture_diffuse1", 0);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
@@ -320,7 +317,7 @@ int main(void)
 
         // Grass
         simpleShader.use();
-        //glStencilMask(0x00);
+        glStencilMask(0x00);
         quadVAO.bind();
         grassTexture.activate(simpleShader, "texture_diffuse1", 0);
         simpleShader.setMat4("projection", projection);
@@ -332,7 +329,6 @@ int main(void)
             float distance = glm::length(camera.Position - vegetation[i]);
             sorted[distance] = vegetation[i];
         }
-
         for (std::map<float, glm::vec3>::reverse_iterator it = sorted.rbegin(); it != sorted.rend(); ++it)
         {
             model = glm::mat4(1.0f);
@@ -349,44 +345,96 @@ int main(void)
         outlineShader.setMat4("projection", projection);
         outlineShader.setMat4("view", view);
         outlineShader.setMat4("model", model);
-        
+
         glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
         glStencilMask(0x00);
         glDisable(GL_DEPTH_TEST);
-        
+
         ourModel.Draw(outlineShader);
-        
+
         glBindVertexArray(0);
         glStencilMask(0xFF);
         glStencilFunc(GL_ALWAYS, 0, 0xFF);
         glEnable(GL_DEPTH_TEST);
         */
 
-        // 2nd pass to draw render texture to screen quad
+        // Second pass to draw normal scene
         fbo.unbind();
-        glDisable(GL_DEPTH_TEST);
-        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+        // pass projection matrix to shader (note that in this case it could change every frame)
+        glm::mat4 zoomProjection = glm::perspective(glm::radians(camera.Fov), (float)SCR_WIDTH / (float)SCR_HEIGHT, NEAR_PLANE, FAR_PLANE);
 
-        screenShader.use();
-        screenVAO.bind();
-        bufferTexture.activate(screenShader, "screenTexture", 0);
+        // activate shader and set uniforms
+        ourShader.use();
+        ourShader.setMat4("projection", zoomProjection);
+
+        // 1st pass backpack
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 0.5f, 0.0f)); // translate it down so it's at the center of the scene
+        model = glm::scale(model, glm::vec3(0.5f, 0.5f, 0.5f));	// it's a bit too big for our scene, so scale it down
+        ourShader.setMat4("model", model);
+
+        //glStencilFunc(GL_ALWAYS, 1, 0xFF);
+        //glStencilMask(0xFF);
+        glStencilMask(0x00);
+        ourModel.Draw(ourShader);
+
+        // floor
+        model = glm::mat4(1.0f);
+        ourShader.setMat4("model", model);
+        glStencilMask(0x00);
+        planeVAO.bind();
+        floorTexture.activate(ourShader, "material.texture_diffuse1", 0);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        //glDrawArrays(GL_TRIANGLES, 0, 6);
+        planeVAO.unbind();
+
+        // Grass
+        simpleShader.use();
+        glStencilMask(0x00);
+        quadVAO.bind();
+        grassTexture.activate(simpleShader, "texture_diffuse1", 0);
+        simpleShader.setMat4("projection", zoomProjection);
+
+        for (std::map<float, glm::vec3>::reverse_iterator it = sorted.rbegin(); it != sorted.rend(); ++it)
+        {
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, it->second);
+            simpleShader.setMat4("model", model);
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        }
+        quadVAO.unbind();
+
+        // Final pass to draw render texture to screen quad
+        if (zoom) {
+            fbo.unbind();
+            glDisable(GL_DEPTH_TEST);
+            //glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+            //glClear(GL_COLOR_BUFFER_BIT);
+
+            screenShader.use();
+            screenVAO.bind();
+            bufferTexture.activate(screenShader, "screenTexture", 0);
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        }
+        
 
         // Swap buffers and poll for IO events
         glfwSwapBuffers(window); 
         glfwPollEvents();
     }
-
+    // Clear objects
     planeVAO.Delete();
     quadVAO.Delete();
-    //screenVAO.Delete();
+    screenVAO.Delete();
     planeVBO.Delete();
     quadVBO.Delete();
-    //screenVBO.Delete();
+    screenVBO.Delete();
     planeEBO.Delete();
     quadEBO.Delete();
-    //screenEBO.Delete();
+    screenEBO.Delete();
     rbo.Delete();
     fbo.Delete();
     // Terminate GLFW
@@ -401,9 +449,12 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 void processInput(GLFWwindow* window)
 {
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
-    }
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_2) == GLFW_PRESS)
+        zoom = true;
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_2) == GLFW_RELEASE)
+        zoom = false;
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
         camera.ProcessKeyboard(FORWARD, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)

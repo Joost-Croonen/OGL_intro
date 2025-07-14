@@ -5,7 +5,7 @@ in vec2 TexCoords;
 
 uniform sampler2D screenTexture;
 
-const float offset = 1.0/720.0;
+const float offset = 1.0/360.0;
 
 void main()
 {
@@ -61,5 +61,5 @@ void main()
         edgeColor += edgeKernel[i] * texSamples[i];
     }
 
-    FragColor = vec4(edgeColor, 1.0);
+    FragColor = texcolor;
 }
