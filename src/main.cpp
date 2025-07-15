@@ -108,6 +108,51 @@ int main(void)
          1.0f / 2.0f,  1.0f / 2.0f, 0.0f,   1.0f, 1.0f
     };
 
+    float cubeVertices[] = {
+        // positions          
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+
+        -1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f,    0.0f, 0.0f
+    };
+
     unsigned int indices[] = {
         0, 1, 2,
         0, 2, 3
@@ -150,11 +195,23 @@ int main(void)
     screenVAO.setAttributes(false);
     screenVAO.unbind();
 
+    // skybox VAO
+    VAO skyVAO = VAO();
+    VBO skyVBO = VBO(cubeVertices, sizeof(cubeVertices));
+    //EBO skyEBO = EBO(indices, sizeof(indices));
+    skyVAO.bind();
+    skyVAO.linkVBO(skyVBO);
+    //screenVAO.linkEBO(screenEBO);
+    skyVAO.setAttributes(false);
+    skyVAO.unbind();
+
     // Shaders
     Shader ourShader("../../../src/shaders/vertex.vert", "../../../src/shaders/fragment.frag");
     Shader outlineShader("../../../src/shaders/outline.vert", "../../../src/shaders/outline.frag");
     Shader simpleShader("../../../src/shaders/simple.vert", "../../../src/shaders/simple.frag");
     Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/screen.frag");
+    Shader skyShader("../../../src/shaders/cubemap.vert", "../../../src/shaders/cubemap.frag");
+    Shader reflectShader("../../../src/shaders/vertex.vert", "../../../src/shaders/refraction.frag");
 
     // Model
     Model ourModel("../../../src/models/backpack/backpack.obj");
@@ -167,6 +224,17 @@ int main(void)
     Texture windowTexture = Texture("../../../src/textures/window.png",
         GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
 
+    std::vector < std::string > cubemap_paths = {
+        "../../../src/textures/skybox/right.jpg", 
+        "../../../src/textures/skybox/left.jpg",
+        "../../../src/textures/skybox/top.jpg",
+        "../../../src/textures/skybox/bottom.jpg",
+        "../../../src/textures/skybox/front.jpg",
+        "../../../src/textures/skybox/back.jpg"
+    };
+
+    Cubemap skybox = Cubemap(cubemap_paths);
+
     // Render to texture
     FBO fbo = FBO();
     fbo.bind();
@@ -178,6 +246,69 @@ int main(void)
     //rbo.unbind();
     fbo.check_status();
     fbo.unbind();
+
+
+
+    // Lights
+    ourShader.use();
+    glm::vec3 pointLightPositions[] = {
+        glm::vec3(0.7f,  0.2f,  2.0f),
+        glm::vec3(2.3f, -3.3f, -4.0f),
+        glm::vec3(-4.0f,  2.0f, -12.0f),
+        glm::vec3(0.0f,  0.0f, -3.0f)
+    };
+    // dir light
+    ourShader.setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
+    ourShader.setVec3("dirLight.ambient", 0.0f, 0.0f, 0.0f);
+    ourShader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
+    ourShader.setVec3("dirLight.specular", 0.4f, 0.4f, 0.4f);
+    // point lights
+    ourShader.setVec3("pointLights[0].position", pointLightPositions[0]);
+    ourShader.setVec3("pointLights[0].ambient", 0.05f, 0.05f, 0.05f);
+    ourShader.setVec3("pointLights[0].diffuse", 0.8f, 0.8f, 0.8f);
+    ourShader.setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
+    ourShader.setFloat("pointLights[0].constant", 1.0f);
+    ourShader.setFloat("pointLights[0].linear", 0.09f);
+    ourShader.setFloat("pointLights[0].quadratic", 0.032f);
+    // point light 2
+    ourShader.setVec3("pointLights[1].position", pointLightPositions[1]);
+    ourShader.setVec3("pointLights[1].ambient", 0.05f, 0.05f, 0.05f);
+    ourShader.setVec3("pointLights[1].diffuse", 0.8f, 0.8f, 0.8f);
+    ourShader.setVec3("pointLights[1].specular", 1.0f, 1.0f, 1.0f);
+    ourShader.setFloat("pointLights[1].constant", 1.0f);
+    ourShader.setFloat("pointLights[1].linear", 0.09f);
+    ourShader.setFloat("pointLights[1].quadratic", 0.032f);
+    // point light 3
+    ourShader.setVec3("pointLights[2].position", pointLightPositions[2]);
+    ourShader.setVec3("pointLights[2].ambient", 0.05f, 0.05f, 0.05f);
+    ourShader.setVec3("pointLights[2].diffuse", 0.8f, 0.8f, 0.8f);
+    ourShader.setVec3("pointLights[2].specular", 1.0f, 1.0f, 1.0f);
+    ourShader.setFloat("pointLights[2].constant", 1.0f);
+    ourShader.setFloat("pointLights[2].linear", 0.09f);
+    ourShader.setFloat("pointLights[2].quadratic", 0.032f);
+    // point light 4
+    ourShader.setVec3("pointLights[3].position", pointLightPositions[3]);
+    ourShader.setVec3("pointLights[3].ambient", 0.05f, 0.05f, 0.05f);
+    ourShader.setVec3("pointLights[3].diffuse", 0.8f, 0.8f, 0.8f);
+    ourShader.setVec3("pointLights[3].specular", 1.0f, 1.0f, 1.0f);
+    ourShader.setFloat("pointLights[3].constant", 1.0f);
+    ourShader.setFloat("pointLights[3].linear", 0.09f);
+    ourShader.setFloat("pointLights[3].quadratic", 0.032f);
+
+    // spot light
+    ourShader.setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
+    ourShader.setVec3("spotLight.diffuse", 0.0f, 0.0f, 0.0f);
+    ourShader.setVec3("spotLight.specular", 0.0f, 0.0f, 0.0f);
+    ourShader.setFloat("spotLight.constant", 1.0f);
+    ourShader.setFloat("spotLight.linear", 0.09f);
+    ourShader.setFloat("spotLight.quadratic", 0.032f);
+    ourShader.setVec3("spotLight.position", camera.Position);
+    ourShader.setVec3("spotLight.direction", camera.Front);
+    ourShader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
+    ourShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(17.5f)));
+
+    // material
+    ourShader.setFloat("material.shininess", 32.0f);
 
     // Enable depht test
     glEnable(GL_DEPTH_TEST);
@@ -219,9 +350,9 @@ int main(void)
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         
-        // pass projection matrix to shader (note that in this case it could change every frame)
+        // projection matrix
         glm::mat4 projection = glm::perspective(glm::radians(15.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, NEAR_PLANE, FAR_PLANE);
-        // camera/view transformation
+        // camera/view matrix
         glm::mat4 view = camera.GetViewMatrix();
         // model matrix
         glm::mat4 model = glm::mat4(1.0f);
@@ -230,69 +361,9 @@ int main(void)
         ourShader.use();
         // viewpos
         ourShader.setVec3("viewPos", camera.Position);
-        // material
-        ourShader.setFloat("material.shininess", 32.0f);
 
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("view", view);
-
-        glm::vec3 pointLightPositions[] = {
-            glm::vec3(0.7f,  0.2f,  2.0f),
-            glm::vec3(2.3f, -3.3f, -4.0f),
-            glm::vec3(-4.0f,  2.0f, -12.0f),
-            glm::vec3(0.0f,  0.0f, -3.0f)
-        };
-        // Lights
-        // dir light
-        ourShader.setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
-        ourShader.setVec3("dirLight.ambient", 0.0f, 0.0f, 0.0f);
-        ourShader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
-        ourShader.setVec3("dirLight.specular", 0.4f, 0.4f, 0.4f);
-        // point lights
-        ourShader.setVec3("pointLights[0].position", pointLightPositions[0]);
-        ourShader.setVec3("pointLights[0].ambient", 0.05f, 0.05f, 0.05f);
-        ourShader.setVec3("pointLights[0].diffuse", 0.8f, 0.8f, 0.8f);
-        ourShader.setVec3("pointLights[0].specular", 1.0f, 1.0f, 1.0f);
-        ourShader.setFloat("pointLights[0].constant", 1.0f);
-        ourShader.setFloat("pointLights[0].linear", 0.09f);
-        ourShader.setFloat("pointLights[0].quadratic", 0.032f);
-        // point light 2
-        ourShader.setVec3("pointLights[1].position", pointLightPositions[1]);
-        ourShader.setVec3("pointLights[1].ambient", 0.05f, 0.05f, 0.05f);
-        ourShader.setVec3("pointLights[1].diffuse", 0.8f, 0.8f, 0.8f);
-        ourShader.setVec3("pointLights[1].specular", 1.0f, 1.0f, 1.0f);
-        ourShader.setFloat("pointLights[1].constant", 1.0f);
-        ourShader.setFloat("pointLights[1].linear", 0.09f);
-        ourShader.setFloat("pointLights[1].quadratic", 0.032f);
-        // point light 3
-        ourShader.setVec3("pointLights[2].position", pointLightPositions[2]);
-        ourShader.setVec3("pointLights[2].ambient", 0.05f, 0.05f, 0.05f);
-        ourShader.setVec3("pointLights[2].diffuse", 0.8f, 0.8f, 0.8f);
-        ourShader.setVec3("pointLights[2].specular", 1.0f, 1.0f, 1.0f);
-        ourShader.setFloat("pointLights[2].constant", 1.0f);
-        ourShader.setFloat("pointLights[2].linear", 0.09f);
-        ourShader.setFloat("pointLights[2].quadratic", 0.032f);
-        // point light 4
-        ourShader.setVec3("pointLights[3].position", pointLightPositions[3]);
-        ourShader.setVec3("pointLights[3].ambient", 0.05f, 0.05f, 0.05f);
-        ourShader.setVec3("pointLights[3].diffuse", 0.8f, 0.8f, 0.8f);
-        ourShader.setVec3("pointLights[3].specular", 1.0f, 1.0f, 1.0f);
-        ourShader.setFloat("pointLights[3].constant", 1.0f);
-        ourShader.setFloat("pointLights[3].linear", 0.09f);
-        ourShader.setFloat("pointLights[3].quadratic", 0.032f);
-
-        // spot light
-        ourShader.setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
-        ourShader.setVec3("spotLight.diffuse", 0.0f, 0.0f, 0.0f);
-        ourShader.setVec3("spotLight.specular", 0.0f, 0.0f, 0.0f);
-        ourShader.setFloat("spotLight.constant", 1.0f);
-        ourShader.setFloat("spotLight.linear", 0.09f);
-        ourShader.setFloat("spotLight.quadratic", 0.032f);
-        ourShader.setVec3("spotLight.position", camera.Position);
-        ourShader.setVec3("spotLight.direction", camera.Front);
-        ourShader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
-        ourShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(17.5f)));
-
 
         // 1st pass backpack
         model = glm::mat4(1.0f);
@@ -301,11 +372,21 @@ int main(void)
         ourShader.setMat4("model", model);
 
         //glStencilFunc(GL_ALWAYS, 1, 0xFF);
-        glStencilMask(0xFF);
+        //glStencilMask(0xFF);
+        //glStencilMask(0x00);
+        //ourModel.Draw(ourShader);
+
+        reflectShader.use();
         glStencilMask(0x00);
-        ourModel.Draw(ourShader);
+        skybox.activate(reflectShader, "skybox", 0);
+        reflectShader.setMat4("projection", projection);
+        reflectShader.setMat4("view", view);
+        reflectShader.setMat4("model", model);
+        reflectShader.setVec3("viewPos", camera.Position);
+        ourModel.Draw(reflectShader);
 
         // floor
+        ourShader.use();
         model = glm::mat4(1.0f);
         ourShader.setMat4("model", model);
         glStencilMask(0x00);
@@ -358,17 +439,30 @@ int main(void)
         glEnable(GL_DEPTH_TEST);
         */
 
+        glDepthFunc(GL_LEQUAL);
+        skyShader.use();
+        glStencilMask(0x00);
+        glm::mat4 cubeView = glm::mat4(glm::mat3(camera.GetViewMatrix()));
+        skyShader.setMat4("view", cubeView);
+        skyShader.setMat4("projection", projection);
+        // ... set view and projection matrix
+        skyVAO.bind();
+        skybox.activate(skyShader, "cubemap", 0);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glDepthFunc(GL_LESS);
+
+        // ######################
         // Second pass to draw normal scene
         fbo.unbind();
         glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-        // pass projection matrix to shader (note that in this case it could change every frame)
-        glm::mat4 zoomProjection = glm::perspective(glm::radians(camera.Fov), (float)SCR_WIDTH / (float)SCR_HEIGHT, NEAR_PLANE, FAR_PLANE);
+        // pass projection matrix to shader
+        projection = glm::perspective(glm::radians(camera.Fov), (float)SCR_WIDTH / (float)SCR_HEIGHT, NEAR_PLANE, FAR_PLANE);
 
         // activate shader and set uniforms
         ourShader.use();
-        ourShader.setMat4("projection", zoomProjection);
+        ourShader.setMat4("projection", projection);
 
         // 1st pass backpack
         model = glm::mat4(1.0f);
@@ -378,10 +472,17 @@ int main(void)
 
         //glStencilFunc(GL_ALWAYS, 1, 0xFF);
         //glStencilMask(0xFF);
-        glStencilMask(0x00);
-        ourModel.Draw(ourShader);
+        //glStencilMask(0x00);
+        //ourModel.Draw(ourShader);
+
+        reflectShader.use();
+        skybox.activate(reflectShader, "skybox", 0);
+        reflectShader.setMat4("projection", projection);
+        reflectShader.setMat4("model", model);
+        ourModel.Draw(reflectShader);
 
         // floor
+        ourShader.use();
         model = glm::mat4(1.0f);
         ourShader.setMat4("model", model);
         glStencilMask(0x00);
@@ -396,7 +497,7 @@ int main(void)
         glStencilMask(0x00);
         quadVAO.bind();
         grassTexture.activate(simpleShader, "texture_diffuse1", 0);
-        simpleShader.setMat4("projection", zoomProjection);
+        simpleShader.setMat4("projection", projection);
 
         for (std::map<float, glm::vec3>::reverse_iterator it = sorted.rbegin(); it != sorted.rend(); ++it)
         {
@@ -406,6 +507,15 @@ int main(void)
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         }
         quadVAO.unbind();
+
+        glDepthFunc(GL_LEQUAL);
+        skyShader.use();
+        glStencilMask(0x00);
+        skyShader.setMat4("projection", projection);
+        skyVAO.bind();
+        skybox.activate(skyShader, "cubemap", 0);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glDepthFunc(GL_LESS);
 
         // Final pass to draw render texture to screen quad
         if (zoom) {
@@ -419,7 +529,6 @@ int main(void)
             bufferTexture.activate(screenShader, "screenTexture", 0);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         }
-        
 
         // Swap buffers and poll for IO events
         glfwSwapBuffers(window); 
