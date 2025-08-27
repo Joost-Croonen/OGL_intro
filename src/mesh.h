@@ -51,6 +51,11 @@ public:
         glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);           // unbind
     }
+    void Delete() const {
+        glDeleteVertexArrays(1, &VAO);
+        glDeleteBuffers(1, &VBO);
+        glDeleteBuffers(1, &EBO);
+    }
 private:
     unsigned int VAO, VBO, EBO;
     void setup_mesh() {

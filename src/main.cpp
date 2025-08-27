@@ -962,10 +962,10 @@ int geom_shader_scene() {
     // Vertices
 
     float pointVertices[] = {
-        -0.5f,  0.5f, // top-left
-         0.5f,  0.5f, // top-right
-         0.5f, -0.5f, // bottom-right
-        -0.5f, -0.5f  // bottom-left
+        -0.5f,  0.5f, 1.0f, 0.0f, 0.0f, // top-left
+         0.5f,  0.5f, 0.0f, 1.0f, 0.0f, // top-right
+         0.5f, -0.5f, 0.0f, 0.0f, 1.0f, // bottom-right
+        -0.5f, -0.5f, 1.0f, 1.0f, 0.0f  // bottom-left
     };
 
     // Buffer objects
@@ -973,7 +973,7 @@ int geom_shader_scene() {
     VBO pointVBO = VBO(pointVertices, sizeof(pointVertices));
     pointVAO.bind();
     pointVAO.linkVBO(pointVBO);
-    pointVAO.setAttributes(2, 0, 0, 0);
+    pointVAO.setAttributes(2, 0, 0, 3);
     pointVAO.unbind();
 
     // Shader
@@ -1039,14 +1039,135 @@ int geom_shader_scene() {
     return 0;
 }
 
+int norm_vect_scene() {
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Setup viewport
+    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+    // Setup geometry, textures, buffers and shaders
+
+    // Shaders
+    Shader simpleShader("../../../src/shaders/simple.vert", "../../../src/shaders/simple.frag");
+    Shader normalShader("../../../src/shaders/normals.vert", "../../../src/shaders/normals.geom", "../../../src/shaders/solid.frag");
+
+    // Setup const shader uniforms
+    simpleShader.use();
+    simpleShader.setMat4("projection", glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f));
+    normalShader.use();
+    normalShader.setMat4("projection", glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f));
+    normalShader.setVec3("color", 1.0f, 1.0f, 0.0f);
+    
+    // Model
+    Model ourModel("../../../src/models/backpack/backpack.obj");
+    
+    // Enable depht test
+    glEnable(GL_DEPTH_TEST);
+
+    // Face culling
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    // Enable stencil testing
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    // Enable blending
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Enable wireframe mode
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+    // Main render loop
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // Set shader uniforms
+        glm::mat4 model = glm::mat4(1.0f);
+        glm::mat4 view = camera.GetViewMatrix();
+        simpleShader.use();
+        simpleShader.setMat4("model", model);
+        simpleShader.setMat4("view", view);
+        normalShader.use();
+        normalShader.setMat4("model", model);
+        normalShader.setMat4("view", view);
+
+        // Draw
+        // main scene
+        simpleShader.use();
+        ourModel.Draw(simpleShader);
+
+        // normal lines
+        normalShader.use();
+        ourModel.Draw(normalShader);
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Clear memory
+    ourModel.Delete();
+    // Terminate
+    glfwTerminate();
+    return 0;
+}
 
 int main(void)
 {
-    switch (3)
+    switch (4)
     {
     case 1: return main_scene(); break;
     case 2: return simple_scene(); break;
     case 3: return geom_shader_scene(); break;
+    case 4: return norm_vect_scene(); break;
     }
 }
 

@@ -16,6 +16,11 @@ public:
 			meshes[i].Draw(shader);
 		}
 	}
+	void Delete() const {
+		for (unsigned int i = 0; i < meshes.size(); i++) {
+			meshes[i].Delete();
+		}
+	}
 private:
 	std::vector<Mesh> meshes;
 	std::string directory;

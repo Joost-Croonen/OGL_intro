@@ -25,7 +25,7 @@ public:
             glEnableVertexAttribArray(attributeCount++);
         } 
         if (vertcolor > 0) {
-            glVertexAttribPointer(attributeCount, texcoords, GL_FLOAT, GL_FALSE, stride * sizeof(float), (void*)((positions + normals + texcoords) * sizeof(float)));
+            glVertexAttribPointer(attributeCount, vertcolor, GL_FLOAT, GL_FALSE, stride * sizeof(float), (void*)((positions + normals + texcoords) * sizeof(float)));
             glEnableVertexAttribArray(attributeCount);
         }
     }
