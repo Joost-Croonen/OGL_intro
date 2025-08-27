@@ -15,6 +15,7 @@
 #include "vao.h"
 #include "fbo.h"
 #include "rbo.h"
+#include "ubo.h"
 #include "shader.h"
 #include "camera.h"
 #include "texture.h"
@@ -43,7 +44,7 @@ bool firstMouse = true;
 float deltaTime = 0.0f;	// time between current frame and last frame
 float lastFrame = 0.0f;
 
-int main(void)
+int main_scene()
 {
     // Initialse GLFW
     glfwInit();
@@ -66,7 +67,7 @@ int main(void)
     glfwMakeContextCurrent(window);
 
     // Intitialise and verify GLAD
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) 
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
         std::cout << "Failed to initialise GLAD" << std::endl;
         glfwTerminate();
@@ -225,7 +226,7 @@ int main(void)
         GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
 
     std::vector < std::string > cubemap_paths = {
-        "../../../src/textures/skybox/right.jpg", 
+        "../../../src/textures/skybox/right.jpg",
         "../../../src/textures/skybox/left.jpg",
         "../../../src/textures/skybox/top.jpg",
         "../../../src/textures/skybox/bottom.jpg",
@@ -332,7 +333,7 @@ int main(void)
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     // Main render loop
-    while (!glfwWindowShouldClose(window)) 
+    while (!glfwWindowShouldClose(window))
     {
         // frame time
         float currentFrame = static_cast<float>(glfwGetTime());
@@ -346,10 +347,10 @@ int main(void)
         fbo.bind();
         glViewport(0, 0, SCR_WIDTH / 2.0, SCR_HEIGHT / 2.0);
         glEnable(GL_DEPTH_TEST);
-        
+
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-        
+
         // projection matrix
         glm::mat4 projection = glm::perspective(glm::radians(15.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, NEAR_PLANE, FAR_PLANE);
         // camera/view matrix
@@ -531,7 +532,7 @@ int main(void)
         }
 
         // Swap buffers and poll for IO events
-        glfwSwapBuffers(window); 
+        glfwSwapBuffers(window);
         glfwPollEvents();
     }
     // Clear objects
@@ -546,9 +547,236 @@ int main(void)
     screenEBO.Delete();
     rbo.Delete();
     fbo.Delete();
-    // Terminate GLFW
+    // Terminate glfw
     glfwTerminate();
     return 0;
+}
+
+int simple_scene() {
+
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Setup viewport
+    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+    // Setup geometry, textures, buffers and shaders
+    // Vertices
+    float cubeVertices[] = {
+        // positions            // texcoords       
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+
+        -1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f,    0.0f, 0.0f
+    };
+
+    for (int i = 0; i < (sizeof(cubeVertices) / sizeof(cubeVertices[0])); i++) {
+        cubeVertices[i] = cubeVertices[i]/2.0;
+    }
+
+    std::vector<glm::vec3> positions;
+    positions.push_back(glm::vec3(-1.5f, 0.0f, -0.48f));
+
+    // Buffer objects
+    VAO cubeVAO = VAO();
+    VBO cubeVBO = VBO(cubeVertices, sizeof(cubeVertices));
+    cubeVAO.bind();
+    cubeVAO.linkVBO(cubeVBO);
+    cubeVAO.setAttributes(false);
+    cubeVAO.unbind();
+
+    // Shaders
+    Shader redShader("../../../src/shaders/ubo_test.vert", "../../../src/shaders/solid.frag");
+    Shader greenShader("../../../src/shaders/ubo_test.vert", "../../../src/shaders/solid.frag");
+    Shader blueShader("../../../src/shaders/ubo_test.vert", "../../../src/shaders/solid.frag");
+    Shader yellowShader("../../../src/shaders/ubo_test.vert", "../../../src/shaders/solid.frag");
+
+    redShader.use();
+    redShader.setVec3("color", 1.0f, 0.0f, 0.0f);
+    greenShader.use();
+    greenShader.setVec3("color", 0.0f, 1.0f, 0.0f);
+    blueShader.use();
+    blueShader.setVec3("color", 0.0f, 0.0f, 1.0f);
+    yellowShader.use();
+    yellowShader.setVec3("color", 1.0f, 1.0f, 0.0f);
+
+    redShader.setUniformBuffer("Matrices", 0);
+    greenShader.setUniformBuffer("Matrices", 0);
+    blueShader.setUniformBuffer("Matrices", 0);
+    yellowShader.setUniformBuffer("Matrices", 0);
+
+    UBO ubo = UBO(2 * sizeof(glm::mat4));
+    ubo.bindRange(0, 0, 2 * sizeof(glm::mat4));
+
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    ubo.writeRange(0, sizeof(glm::mat4), glm::value_ptr(projection));
+
+    // Model
+    //Model ourModel("../../../src/models/backpack/backpack.obj");
+
+    // Load other textures
+    //Texture floorTexture = Texture("../../../src/textures/marble.jpg",
+    //    GL_REPEAT, GL_REPEAT, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
+
+    // Enable depht test
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    // Face culling
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    // Enable stencil testing
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    // Enable blending
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Enable wireframe mode
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+    // Main render loop
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glm::mat4 view = camera.GetViewMatrix();
+        ubo.writeRange(sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
+
+        glm::mat4 model = glm::mat4(1.0f);
+
+        cubeVAO.bind();
+        
+        redShader.use();
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(-0.75, 0.75, 0.0));
+        redShader.setMat4("model", model);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+
+        greenShader.use();
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.75, 0.75, 0.0));
+        redShader.setMat4("model", model);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+
+        blueShader.use();
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.75, -0.75, 0.0));
+        redShader.setMat4("model", model);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+
+        yellowShader.use();
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(-0.75, -0.75, 0.0));
+        redShader.setMat4("model", model);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();   
+    };
+    // Terminate
+    cubeVAO.Delete();
+    cubeVBO.Delete();
+    glfwTerminate();
+    return 0;
+}
+
+int main(void)
+{
+    switch (2)
+    {
+    case 1: 
+        return main_scene();
+        break;
+    case 2:
+        return simple_scene();
+        break;
+    }
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) 
