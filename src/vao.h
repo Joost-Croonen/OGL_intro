@@ -11,23 +11,23 @@ public:
     void unbind() const { glBindVertexArray(0); }
     void linkVBO(VBO vbo) const { vbo.bind();}
     void linkEBO(EBO ebo) const { ebo.bind(); }
-    void setAttributes(bool normals = true) {
-        unsigned int stride = 5;
-        unsigned int vertexCoordStart = 3;
-        unsigned int vertexCoordAttr = 1;
-        if (normals) {
-            stride = 8;
-            vertexCoordStart = 6;
-            vertexCoordAttr = 2;
+    void setAttributes(unsigned int positions = 3, unsigned int normals = 3, unsigned int texcoords = 2, unsigned int vertcolor = 0) {
+        unsigned int stride = positions + normals + texcoords + vertcolor;
+        unsigned int attributeCount = 0;
+        glVertexAttribPointer(attributeCount, positions, GL_FLOAT, GL_FALSE, stride * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(attributeCount++);
+        if (normals > 0) {
+            glVertexAttribPointer(attributeCount, normals, GL_FLOAT, GL_FALSE, stride * sizeof(float), (void*)(positions * sizeof(float)));
+            glEnableVertexAttribArray(attributeCount++);
         }
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride * sizeof(float), (void*)0);
-        glEnableVertexAttribArray(0);
-        if (normals) {
-            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride * sizeof(float), (void*)(3 * sizeof(float)));
-            glEnableVertexAttribArray(1);
+        if (texcoords > 0) {
+            glVertexAttribPointer(attributeCount, texcoords, GL_FLOAT, GL_FALSE, stride * sizeof(float), (void*)((positions + normals) * sizeof(float)));
+            glEnableVertexAttribArray(attributeCount++);
+        } 
+        if (vertcolor > 0) {
+            glVertexAttribPointer(attributeCount, texcoords, GL_FLOAT, GL_FALSE, stride * sizeof(float), (void*)((positions + normals + texcoords) * sizeof(float)));
+            glEnableVertexAttribArray(attributeCount);
         }
-        glVertexAttribPointer(vertexCoordAttr, 2, GL_FLOAT, GL_FALSE, stride * sizeof(float), (void*)(vertexCoordStart * sizeof(float)));
-        glEnableVertexAttribArray(vertexCoordAttr);
     }
     void Delete() { glDeleteVertexArrays(1, &id); }
 };

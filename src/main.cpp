@@ -44,6 +44,159 @@ bool firstMouse = true;
 float deltaTime = 0.0f;	// time between current frame and last frame
 float lastFrame = 0.0f;
 
+int base_scene() {
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Setup viewport
+    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+    // Setup geometry, textures, buffers and shaders
+    // Vertices
+    float vertices[] = {
+        // positions            // texcoords       
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+
+        -1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f,    0.0f, 0.0f
+    };
+
+    // Buffer objects
+    VAO cubeVAO = VAO();
+    VBO cubeVBO = VBO(vertices, sizeof(vertices));
+    cubeVAO.bind();
+    cubeVAO.linkVBO(cubeVBO);
+    cubeVAO.setAttributes(3, 0, 2);
+    cubeVAO.unbind();
+
+    // Shaders
+    Shader simpleShader("../../../src/shaders/simple.vert", "../../../src/shaders/simple.frag");
+
+    // Model
+    Model ourModel("../../../src/models/backpack/backpack.obj");
+
+    // Load other textures
+    Texture floorTexture = Texture("../../../src/textures/marble.jpg",
+        GL_REPEAT, GL_REPEAT, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
+
+    // Enable depht test
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    // Face culling
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    // Enable stencil testing
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    // Enable blending
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Enable wireframe mode
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+    // Main render loop
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Terminate
+    cubeVAO.Delete();
+    cubeVBO.Delete();
+    glfwTerminate();
+    return 0;
+}
+
 int main_scene()
 {
     // Initialse GLFW
@@ -193,7 +346,7 @@ int main_scene()
     screenVAO.bind();
     screenVAO.linkVBO(screenVBO);
     screenVAO.linkEBO(screenEBO);
-    screenVAO.setAttributes(false);
+    screenVAO.setAttributes(3, 0, 2);
     screenVAO.unbind();
 
     // skybox VAO
@@ -203,7 +356,7 @@ int main_scene()
     skyVAO.bind();
     skyVAO.linkVBO(skyVBO);
     //screenVAO.linkEBO(screenEBO);
-    skyVAO.setAttributes(false);
+    skyVAO.setAttributes(3, 0, 2);
     skyVAO.unbind();
 
     // Shaders
@@ -651,7 +804,7 @@ int simple_scene() {
     VBO cubeVBO = VBO(cubeVertices, sizeof(cubeVertices));
     cubeVAO.bind();
     cubeVAO.linkVBO(cubeVBO);
-    cubeVAO.setAttributes(false);
+    cubeVAO.setAttributes(3, 0, 2);
     cubeVAO.unbind();
 
     // Shaders
@@ -766,16 +919,134 @@ int simple_scene() {
     return 0;
 }
 
+int geom_shader_scene() {
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Setup viewport
+    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    //glfwSetCursorPosCallback(window, mouse_callback);
+
+    // Setup geometry, textures, buffers and shaders
+    // Vertices
+
+    float pointVertices[] = {
+        -0.5f,  0.5f, // top-left
+         0.5f,  0.5f, // top-right
+         0.5f, -0.5f, // bottom-right
+        -0.5f, -0.5f  // bottom-left
+    };
+
+    // Buffer objects
+    VAO pointVAO = VAO();
+    VBO pointVBO = VBO(pointVertices, sizeof(pointVertices));
+    pointVAO.bind();
+    pointVAO.linkVBO(pointVBO);
+    pointVAO.setAttributes(2, 0, 0, 0);
+    pointVAO.unbind();
+
+    // Shader
+    Shader shader("../../../src/shaders/geotest.vert", "../../../src/shaders/geotest.geom", "../../../src/shaders/geotest.frag");
+
+    // Model
+    //Model ourModel("../../../src/models/backpack/backpack.obj");
+
+    // Load other textures
+    //Texture floorTexture = Texture("../../../src/textures/marble.jpg",
+    //    GL_REPEAT, GL_REPEAT, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
+
+    // Enable depht test
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    // Face culling
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    // Enable stencil testing
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    // Enable blending
+    glEnable(GL_BLEND);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Enable wireframe mode
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+    // Main render loop
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        //float currentFrame = static_cast<float>(glfwGetTime());
+        //deltaTime = currentFrame - lastFrame;
+        //lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+        //glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // Draw
+        shader.use();
+        pointVAO.bind();
+        glDrawArrays(GL_POINTS, 0, 4);
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Terminate
+    pointVAO.Delete();
+    pointVBO.Delete();
+    glfwTerminate();
+    return 0;
+}
+
+
 int main(void)
 {
-    switch (2)
+    switch (3)
     {
-    case 1: 
-        return main_scene();
-        break;
-    case 2:
-        return simple_scene();
-        break;
+    case 1: return main_scene(); break;
+    case 2: return simple_scene(); break;
+    case 3: return geom_shader_scene(); break;
     }
 }
 
