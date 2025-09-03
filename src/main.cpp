@@ -530,6 +530,7 @@ int main_scene()
         //glStencilMask(0x00);
         //ourModel.Draw(ourShader);
 
+        /*
         reflectShader.use();
         glStencilMask(0x00);
         skybox.activate(reflectShader, "skybox", 0);
@@ -538,6 +539,15 @@ int main_scene()
         reflectShader.setMat4("model", model);
         reflectShader.setVec3("viewPos", camera.Position);
         ourModel.Draw(reflectShader);
+        */
+        simpleShader.use();
+        glStencilMask(0x00);
+        skybox.activate(simpleShader, "skybox", 0);
+        simpleShader.setMat4("projection", projection);
+        simpleShader.setMat4("view", view);
+        simpleShader.setMat4("model", model);
+        simpleShader.setVec3("viewPos", camera.Position);
+        ourModel.Draw(simpleShader);
 
         // floor
         ourShader.use();
@@ -629,11 +639,18 @@ int main_scene()
         //glStencilMask(0x00);
         //ourModel.Draw(ourShader);
 
+        /*
         reflectShader.use();
         skybox.activate(reflectShader, "skybox", 0);
         reflectShader.setMat4("projection", projection);
         reflectShader.setMat4("model", model);
         ourModel.Draw(reflectShader);
+        */
+        simpleShader.use();
+        skybox.activate(simpleShader, "skybox", 0);
+        simpleShader.setMat4("projection", projection);
+        simpleShader.setMat4("model", model);
+        ourModel.Draw(simpleShader);
 
         // floor
         ourShader.use();
@@ -1317,15 +1334,208 @@ int instancing_scene() {
     return 0;
 }
 
+int asteroid_scene() {
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Setup viewport
+    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+    // Setup geometry, textures, buffers and shaders
+    // Vertices
+
+    unsigned int amount = 1000;
+    glm::mat4* modelMatrices;
+    modelMatrices = new glm::mat4[amount];
+    srand(glfwGetTime());
+    float radius = 50.0;
+    float offset = 2.5f;
+    for (unsigned int i = 0; i < amount; i++)
+    {
+        glm::mat4 model = glm::mat4(1.0f);
+        // translation
+        float angle = (float)i / amount * 360.0;
+        float displacement = (rand() % (int)(2 * offset * 100.0)) / 100.0 - offset;
+        float x = sin(angle) * radius + displacement;
+        displacement = (rand() % (int)(2 * offset * 100.0)) / 100.0 - offset;
+        float z = cos(angle) * radius + displacement;
+        displacement = (rand() % (int)(2 * offset * 100.0)) / 100.0 - offset;
+        float y = 0.4 * displacement;
+        model = glm::translate(model, glm::vec3(x, y, z));
+        // scale
+        float scale = (rand() % 20) / 100.0 + 0.05;
+        model = glm::scale(model, glm::vec3(scale));
+        // rotation
+        float rotAngle = (rand() % 360);
+        model = glm::rotate(model, rotAngle, glm::vec3(0.4f, 0.6f, 0.8f));
+        // assign
+        modelMatrices[i] = model;
+    }
+
+
+    // Shaders
+    Shader planetShader("../../../src/shaders/simple.vert", "../../../src/shaders/simple.frag");
+    Shader rockShader("../../../src/shaders/asteroid.vert", "../../../src/shaders/simple.frag");
+
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 1000.0f);
+    planetShader.use();
+    planetShader.setMat4("projection", projection);
+    rockShader.use();
+    rockShader.setMat4("projection", projection);
+
+    // Model
+    Model planet("../../../src/models/planet/planet.obj");
+    Model rock("../../../src/models/rock/rock.obj");
+
+    // Buffer objects
+    unsigned int instanceVBO;
+    glGenBuffers(1, &instanceVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::mat4) * amount, &modelMatrices[0], GL_STATIC_DRAW);
+    std::size_t vec4size = sizeof(glm::vec4);
+    for (unsigned int i = 0; i < rock.meshes.size() ; i++)
+    {
+        unsigned int VAO = rock.meshes[i].VAO;
+        glBindVertexArray(VAO);
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 4 * vec4size, (void*)0);
+        glVertexAttribDivisor(3, 1);
+        glEnableVertexAttribArray(4);
+        glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, 4 * vec4size, (void*)(1 * vec4size));
+        glVertexAttribDivisor(4, 1);
+        glEnableVertexAttribArray(5);
+        glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, 4 * vec4size, (void*)(2 * vec4size));
+        glVertexAttribDivisor(5, 1);
+        glEnableVertexAttribArray(6);
+        glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, 4 * vec4size, (void*)(3 * vec4size));
+        glVertexAttribDivisor(6, 1);
+        glBindVertexArray(0);
+    }
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    // Load other textures
+    //Texture floorTexture = Texture("../../../src/textures/marble.jpg",
+    //    GL_REPEAT, GL_REPEAT, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
+
+    // Enable depht test
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    // Face culling
+    //glEnable(GL_CULL_FACE);
+    //glCullFace(GL_BACK);
+    //glFrontFace(GL_CCW);
+
+    // Enable stencil testing
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    // Enable blending
+    //glEnable(GL_BLEND);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Enable wireframe mode
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+    // Main render loop
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+        //glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // Update uniforms
+        glm::mat4 model = glm::mat4(1.0f);
+        glm::mat4 view = camera.GetViewMatrix();
+
+        planetShader.use();
+        planetShader.setMat4("view", view);
+        model = glm::translate(model, glm::vec3(0.0f, -3.0f, 0.0f));
+        model = glm::scale(model, glm::vec3(4.0f, 4.0f, 4.0f));
+        model = glm::rotate(model, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+        planetShader.setMat4("model", model);
+
+        rockShader.use();
+        rockShader.setMat4("view", view);
+
+        // Draw
+        planetShader.use();
+        planet.Draw(planetShader);
+
+        rockShader.use();
+        rockShader.setInt("texture_diffuse1", 0);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, rock.textures_loaded[0].id);
+        for (unsigned int i = 0; i < rock.meshes.size(); i++)
+        {
+            glBindVertexArray(rock.meshes[i].VAO);
+            glDrawElementsInstanced(GL_TRIANGLES, rock.meshes[i].indices.size(), GL_UNSIGNED_INT, 0, amount);
+        }
+
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Terminate
+    planet.Delete();
+    rock.Delete();
+    glfwTerminate();
+    return 0;
+}
+
 int main(void)
 {
-    switch (5)
+    switch (6)
     {
     case 1: return main_scene(); break;
     case 2: return simple_scene(); break;
     case 3: return geom_shader_scene(); break;
     case 4: return norm_vect_scene(); break;
     case 5: return instancing_scene(); break;
+    case 6: return asteroid_scene(); break;
     }
 }
 

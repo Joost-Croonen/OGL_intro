@@ -17,6 +17,7 @@ struct TextureData {
 class Mesh
 {
 public:
+    unsigned int VAO, VBO, EBO;
     std::vector<Vertex>         vertices;
     std::vector<unsigned int>   indices;
     std::vector<TextureData>    textures;
@@ -57,7 +58,6 @@ public:
         glDeleteBuffers(1, &EBO);
     }
 private:
-    unsigned int VAO, VBO, EBO;
     void setup_mesh() {
         // Create buffers
         glGenVertexArrays(1, &VAO);

@@ -8,6 +8,9 @@
 class Model
 {
 public:
+	std::vector<Mesh> meshes;
+	std::string directory;
+	std::vector<TextureData> textures_loaded;
 	Model(const char* path) {
 		loadModel(path);
 	}
@@ -22,18 +25,14 @@ public:
 		}
 	}
 private:
-	std::vector<Mesh> meshes;
-	std::string directory;
-	std::vector<TextureData> textures_loaded;
-
 	void loadModel(std::string path){
 		// assimp load scene
-		Assimp::Importer import;
-		const aiScene* scene = import.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs);
+		Assimp::Importer importer;
+		const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs);
 		// error handling
 		if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
 		{
-			std::cout << "ERROR::ASSIMP::" << import.GetErrorString() << std::endl;
+			std::cout << "ERROR::ASSIMP::" << importer.GetErrorString() << std::endl;
 			return;
 		}
 		// set directory
@@ -66,10 +65,13 @@ private:
 			vector.y = mesh->mVertices[i].y;
 			vector.z = mesh->mVertices[i].z;
 			vertex.Position = vector;
-			vector.x = mesh->mNormals[i].x;
-			vector.y = mesh->mNormals[i].y;
-			vector.z = mesh->mNormals[i].z;
-			vertex.Normal = vector;
+			if (mesh->HasNormals())
+			{
+				vector.x = mesh->mNormals[i].x;
+				vector.y = mesh->mNormals[i].y;
+				vector.z = mesh->mNormals[i].z;
+				vertex.Normal = vector;
+			}
 			if (mesh->mTextureCoords[0]) {
 				glm::vec2 vector;
 				vector.x = mesh->mTextureCoords[0][i].x;
@@ -91,12 +93,22 @@ private:
 		// process textures
 		if (mesh->mMaterialIndex >= 0) {
 			aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+			// Diffuse
 			std::vector<TextureData> diffuseMaps 
 				= loadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_diffuse");
 			textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
+			// Specular
 			std::vector<TextureData> specularMaps 
 				= loadMaterialTextures(material, aiTextureType_SPECULAR, "texture_specular");
 			textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
+			// Normal
+			std::vector<TextureData> normalMaps
+				= loadMaterialTextures(material, aiTextureType_HEIGHT, "texture_normal");
+			textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
+			// Height
+			std::vector<TextureData> heightMaps
+				= loadMaterialTextures(material, aiTextureType_AMBIENT, "texture_height");
+			textures.insert(textures.end(), heightMaps.begin(), heightMaps.end());
 		}
 		return Mesh(vertices, indices, textures);
 	}
