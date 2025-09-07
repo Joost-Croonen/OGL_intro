@@ -1526,9 +1526,245 @@ int asteroid_scene() {
     return 0;
 }
 
+int msaa_scene() {
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, 4);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Setup viewport
+    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+    // Setup geometry, textures, buffers and shaders
+    // Vertices
+    float cubeVertices[] = {
+        // positions            // texcoords       
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+
+        -1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f,    0.0f, 0.0f
+    };
+
+    float screenVertices[] = {   // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
+        // positions   // texCoords
+        -1.0f,  1.0f,  0.0f, 1.0f,
+        -1.0f, -1.0f,  0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f, 0.0f,
+
+        -1.0f,  1.0f,  0.0f, 1.0f,
+         1.0f, -1.0f,  1.0f, 0.0f,
+         1.0f,  1.0f,  1.0f, 1.0f
+    };
+
+    // Vertex buffers
+    // cube
+    VAO cubeVAO = VAO();
+    VBO cubeVBO = VBO(cubeVertices, sizeof(cubeVertices));
+    cubeVAO.bind();
+    cubeVAO.linkVBO(cubeVBO);
+    cubeVAO.setAttributes(3, 0, 2);
+    cubeVAO.unbind();
+    // screen
+    VAO screenVAO = VAO();
+    VBO screenVBO = VBO(screenVertices, sizeof(screenVertices));
+    screenVAO.bind();
+    screenVAO.linkVBO(screenVBO);
+    screenVAO.setAttributes(2, 0, 2);
+    screenVAO.unbind();
+
+    // Frame buffers
+    FBO multisampleFrameBuffer = FBO();
+    multisampleFrameBuffer.bind();
+    Texture multiSampleBufferTexture = Texture(SCR_WIDTH, SCR_HEIGHT, GL_RGB, 4);
+    multiSampleBufferTexture.attach(GL_COLOR_ATTACHMENT0);
+    RBO rbo = RBO(SCR_WIDTH, SCR_HEIGHT, GL_DEPTH24_STENCIL8, 4);
+    rbo.attach(GL_DEPTH_STENCIL_ATTACHMENT);
+    multisampleFrameBuffer.check_status();
+    multisampleFrameBuffer.unbind();
+
+    FBO postProcessFrameBuffer = FBO();
+    postProcessFrameBuffer.bind();
+    Texture screenBufferTexture = Texture(SCR_WIDTH, SCR_HEIGHT, GL_RGB);
+    screenBufferTexture.attach(GL_COLOR_ATTACHMENT0);
+    postProcessFrameBuffer.check_status();
+    postProcessFrameBuffer.unbind();
+
+    // Shaders
+    Shader simpleShader("../../../src/shaders/simple.vert", "../../../src/shaders/solid.frag");
+    Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
+    
+    simpleShader.use();
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 1000.0f);
+    simpleShader.setMat4("projection", projection);
+    simpleShader.setVec3("color", 0.0, 1.0, 0.0);
+
+    // Model
+    //Model ourModel("../../../src/models/backpack/backpack.obj");
+
+    // Load other textures
+    //Texture floorTexture = Texture("../../../src/textures/marble.jpg",
+    //    GL_REPEAT, GL_REPEAT, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
+
+    
+
+    // Enable depht test
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    // Face culling
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    // MSAA
+    glEnable(GL_MULTISAMPLE);
+
+    // Enable stencil testing
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    // Enable blending
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Enable wireframe mode
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+    // Main render loop
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+        //glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // 1. First pass to multisample buffer
+        multisampleFrameBuffer.bind();
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
+
+        simpleShader.use();
+        glm::mat4 model = glm::mat4(1.0f);
+        simpleShader.setMat4("model", model);
+        glm::mat4 view = camera.GetViewMatrix();
+        simpleShader.setMat4("view", view);
+
+        cubeVAO.bind();
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+
+        // 2. Draw framebuffer to screen
+        multisampleFrameBuffer.blit(SCR_WIDTH, SCR_HEIGHT, postProcessFrameBuffer.id);
+        multisampleFrameBuffer.unbind();
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glDisable(GL_DEPTH_TEST);
+        
+        screenShader.use();
+        screenVAO.bind();
+        screenBufferTexture.activate(screenShader, "screenTexture", GL_TEXTURE0);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Terminate
+    cubeVAO.Delete();
+    cubeVBO.Delete();
+
+    screenVAO.Delete();
+    screenVBO.Delete();
+
+    multisampleFrameBuffer.Delete();
+    postProcessFrameBuffer.Delete();
+    rbo.Delete();
+
+    glfwTerminate();
+    return 0;
+}
+
 int main(void)
 {
-    switch (6)
+    switch (7)
     {
     case 1: return main_scene(); break;
     case 2: return simple_scene(); break;
@@ -1536,6 +1772,7 @@ int main(void)
     case 4: return norm_vect_scene(); break;
     case 5: return instancing_scene(); break;
     case 6: return asteroid_scene(); break;
+    case 7: return msaa_scene(); break;
     }
 }
 

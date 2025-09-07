@@ -5,10 +5,15 @@ class RBO
 {
 public:
 	unsigned int id;
-	RBO(unsigned int width, unsigned int height, GLenum type) {
+	unsigned int samples;
+	RBO(unsigned int width, unsigned int height, GLenum type, unsigned int samples = 1): samples(samples) {
 		glGenRenderbuffers(1, &id);
 		glBindRenderbuffer(GL_RENDERBUFFER, id);
-		glRenderbufferStorage(GL_RENDERBUFFER, type, width, height);
+		if (samples == 1)
+			glRenderbufferStorage(GL_RENDERBUFFER, type, width, height);
+		else
+			glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, type, width, height);
+		glBindRenderbuffer(GL_RENDERBUFFER, 0);
 	}
 	void bind() const {
 		glBindRenderbuffer(GL_RENDERBUFFER, id);

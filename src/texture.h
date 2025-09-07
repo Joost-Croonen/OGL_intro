@@ -60,7 +60,7 @@ public:
     Texture(const char* path, 
         GLint wrap_s = GL_REPEAT, GLint wrap_t = GL_REPEAT,
         GLint min_filt = GL_LINEAR_MIPMAP_LINEAR, GLint mag_filt = GL_LINEAR) :
-        albedoPath(path)
+        albedoPath(path), samples(1)
 	{
         // Set image orientation
         stbi_set_flip_vertically_on_load(true);
@@ -95,15 +95,25 @@ public:
 	}
 
     Texture(unsigned int width, unsigned int height, GLenum format, 
-        GLint min_filt=GL_LINEAR, GLint mag_filt=GL_LINEAR) :
-        albedoPath(""), width(width), height(height)
+        unsigned int samples = 1, GLint min_filt=GL_LINEAR, GLint mag_filt=GL_LINEAR) :
+        albedoPath(""), width(width), height(height), samples(samples)
     {
         glGenTextures(1, &id);
-        glBindTexture(GL_TEXTURE_2D, id);
-        glTexImage2D(GL_TEXTURE_2D, 0, format, this->width, this->height, 0, format, GL_UNSIGNED_BYTE, NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filt);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filt);
-        glBindTexture(GL_TEXTURE_2D, 0);
+        if (samples == 1)
+        {
+            glBindTexture(GL_TEXTURE_2D, id);
+            glTexImage2D(GL_TEXTURE_2D, 0, format, this->width, this->height, 0, format, GL_UNSIGNED_BYTE, NULL);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filt);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filt);
+            glBindTexture(GL_TEXTURE_2D, 0);
+        }
+        else 
+        {
+            glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, id);
+            glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, samples, format, this->width, this->height, GL_TRUE);
+            glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, 0);
+        }
+        
     }
 
     void activate(Shader shader, const char* name, GLenum texture_unit) const
@@ -113,15 +123,19 @@ public:
         shader.setInt(name, texture_unit);
     }
 
-    void attach(GLenum type) const
+    void attach(GLenum attachement) const
     {
-        glFramebufferTexture2D(GL_FRAMEBUFFER, type, GL_TEXTURE_2D, id, 0);
+        if (samples==1)
+            glFramebufferTexture2D(GL_FRAMEBUFFER, attachement, GL_TEXTURE_2D, id, 0);
+        else
+            glFramebufferTexture2D(GL_FRAMEBUFFER, attachement, GL_TEXTURE_2D_MULTISAMPLE, id, 0);
     }
 
 private:
-    int width, height, nrChannels;
+    int width, height, nrChannels, samples;
     const char* albedoPath;
     unsigned char* data;
+    
 };
 
 class Cubemap
