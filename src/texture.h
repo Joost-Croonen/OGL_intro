@@ -120,6 +120,7 @@ public:
     {
         glActiveTexture(texture_unit);
         glBindTexture(GL_TEXTURE_2D, id);
+        shader.use();
         shader.setInt(name, texture_unit);
     }
 

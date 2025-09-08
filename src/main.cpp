@@ -52,6 +52,7 @@ int base_scene() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, 4);
 
     // Create and verify window 
     GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
@@ -73,9 +74,6 @@ int base_scene() {
         return -1;
     }
 
-    // Setup viewport
-    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
-
     // Handle resizing of viewport
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
@@ -85,68 +83,37 @@ int base_scene() {
 
     // Setup geometry, textures, buffers and shaders
     // Vertices
-    float vertices[] = {
-        // positions            // texcoords       
-        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
-        -1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
-         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
-         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
-         1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
-        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
+    float planeVertices[] = {
+        // positions            // normals         // texcoords
+         10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,  10.0f,  0.0f,
+         10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,
+        -10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,   0.0f, 10.0f,
 
-        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
-        -1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
-        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
-        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
-        -1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
-        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
-
-         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
-         1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
-         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
-         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
-         1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
-         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
-
-        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
-        -1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
-         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
-         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
-         1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
-        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
-
-        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
-         1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
-         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
-         1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
-        -1.0f,  1.0f,  1.0f,    0.0f, 0.0f,
-        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f,
-
-        -1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
-        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
-         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
-         1.0f, -1.0f, -1.0f,    0.0f, 0.0f,
-        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f,
-         1.0f, -1.0f,  1.0f,    0.0f, 0.0f
+         10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,  10.0f,  0.0f,
+        -10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,   0.0f, 10.0f,
+        -10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,  10.0f, 10.0f
     };
 
     // Buffer objects
-    VAO cubeVAO = VAO();
-    VBO cubeVBO = VBO(vertices, sizeof(vertices));
-    cubeVAO.bind();
-    cubeVAO.linkVBO(cubeVBO);
-    cubeVAO.setAttributes(3, 0, 2);
-    cubeVAO.unbind();
+    VAO planeVAO = VAO();
+    VBO planeVBO = VBO(planeVertices, sizeof(planeVertices));
+    planeVAO.bind();
+    planeVAO.linkVBO(planeVBO);
+    planeVAO.setAttributes(3, 3, 2);
+    planeVAO.unbind();
 
     // Shaders
-    Shader simpleShader("../../../src/shaders/simple.vert", "../../../src/shaders/simple.frag");
+    Shader ourShader("../../../src/shaders/simple.vert", "../../../src/shaders/simple.frag");
+
+    ourShader.use();
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    ourShader.setMat4("projection", projection);
 
     // Model
-    Model ourModel("../../../src/models/backpack/backpack.obj");
+    //Model ourModel("../../../src/models/backpack/backpack.obj");
 
     // Load other textures
-    Texture floorTexture = Texture("../../../src/textures/marble.jpg",
-        GL_REPEAT, GL_REPEAT, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
+    Texture floorTexture = Texture("../../../src/textures/wood.png");
 
     // Enable depht test
     glEnable(GL_DEPTH_TEST);
@@ -156,6 +123,9 @@ int base_scene() {
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
+
+    // MSAA
+    glEnable(GL_MULTISAMPLE);
 
     // Enable stencil testing
     //glEnable(GL_STENCIL_TEST);
@@ -185,14 +155,23 @@ int base_scene() {
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        // Draw
+        glm::mat4 model = glm::mat4(1.0f);
+        glm::mat4 view = camera.GetViewMatrix();
+
+        ourShader.use();
+        ourShader.setMat4("model", model);
+        ourShader.setMat4("view", view);
+        planeVAO.bind();
+        glDrawArrays(GL_TRIANGLES, 0, 6);
 
         // Swap buffers and poll for IO events
         glfwSwapBuffers(window);
         glfwPollEvents();
     };
     // Terminate
-    cubeVAO.Delete();
-    cubeVBO.Delete();
+    planeVAO.Delete();
+    planeVBO.Delete();
     glfwTerminate();
     return 0;
 }
@@ -1556,9 +1535,6 @@ int msaa_scene() {
         return -1;
     }
 
-    // Setup viewport
-    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
-
     // Handle resizing of viewport
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
@@ -1685,7 +1661,7 @@ int msaa_scene() {
     glFrontFace(GL_CCW);
 
     // MSAA
-    glEnable(GL_MULTISAMPLE);
+    // glEnable(GL_MULTISAMPLE);
 
     // Enable stencil testing
     //glEnable(GL_STENCIL_TEST);
@@ -1762,10 +1738,151 @@ int msaa_scene() {
     return 0;
 }
 
+int blinn_phong_scene() {
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, 1);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Setup viewport
+    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+    // OGL state
+    // Depht test
+    glEnable(GL_DEPTH_TEST);
+    //glDepthFunc(GL_LESS);
+
+    // Face culling
+    // glEnable(GL_CULL_FACE);
+    // glCullFace(GL_BACK);
+    // glFrontFace(GL_CCW);
+
+    // MSAA
+    //glEnable(GL_MULTISAMPLE);
+
+    // Stencil testing
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    // Blending
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Wireframe mode
+    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+    // Setup geometry, textures, buffers and shaders
+    // Vertices
+    float planeVertices[] = {
+        // positions            // normals         // texcoords
+         10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,  10.0f,  0.0f,
+        -10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,
+        -10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,   0.0f, 10.0f,
+    
+         10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,  10.0f,  0.0f,
+        -10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,   0.0f, 10.0f,
+         10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,  10.0f, 10.0f
+    };
+
+    // Buffer objects
+    VAO planeVAO = VAO();
+    VBO planeVBO = VBO(planeVertices, sizeof(planeVertices));
+    planeVAO.bind();
+    planeVAO.linkVBO(planeVBO);
+    planeVAO.setAttributes(3, 3, 2);
+    planeVAO.unbind();
+
+    // Shaders
+    Shader ourShader("../../../src/shaders/vertex.vert", "../../../src/shaders/blinn_phong.frag");
+
+    ourShader.use();
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    ourShader.setMat4("projection", projection);
+    ourShader.setVec3("lightPos", 0.0, 0.0, 0.0);
+
+    // Model
+    //Model ourModel("../../../src/models/backpack/backpack.obj");
+
+    // Load other textures
+    Texture floorTexture = Texture("../../../src/textures/wood.png");
+
+    // Main render loop
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // Draw
+        glm::mat4 model = glm::mat4(1.0f);
+        glm::mat4 view = camera.GetViewMatrix();
+
+        ourShader.use();
+        ourShader.setMat4("model", model);
+        ourShader.setMat4("view", view);
+        ourShader.setVec3("viewPos", camera.Position);
+
+        floorTexture.activate(ourShader, "texture_diffuse1", 0);
+
+        planeVAO.bind();
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Terminate
+    planeVAO.Delete();
+    planeVBO.Delete();
+    glfwTerminate();
+    return 0;
+}
+
 int main(void)
 {
-    switch (7)
+    switch (0)
     {
+    case 0: return base_scene(); break;
     case 1: return main_scene(); break;
     case 2: return simple_scene(); break;
     case 3: return geom_shader_scene(); break;
@@ -1773,6 +1890,7 @@ int main(void)
     case 5: return instancing_scene(); break;
     case 6: return asteroid_scene(); break;
     case 7: return msaa_scene(); break;
+    case 8: return blinn_phong_scene(); break;
     }
 }
 

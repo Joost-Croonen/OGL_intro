@@ -26,20 +26,20 @@ void texSampler(inout vec3 texSamples[9])
     }
 }
 
-void invertColor(inout vec4 color)
+vec4 invertColor()
 {
     vec4 texColor = texture(screenTexture, TexCoords);
-    color = vec4(vec3(1.0-texColor), 1.0);
+    return vec4(vec3(1.0-texColor), 1.0);
 }
 
-void grayScaleColor(inout vec4 color)
+vec4 grayScaleColor()
 {
     vec4 texColor = texture(screenTexture, TexCoords);
     float average = ( 0.2126 * texColor.r + 0.7152 * texColor.g + 0.0722 * texColor.b)/3.0;
-    color = vec4(average, average, average, 1.0);
+    return vec4(average, average, average, 1.0);
 }
 
-void sharpenColor(inout vec4 color)
+vec4 sharpenColor()
 {
     float sharpKernel[9] = float[](
         -1, -1, -1,
@@ -52,10 +52,10 @@ void sharpenColor(inout vec4 color)
     for(int i = 0; i<9; i++){
         sharpCol += sharpKernel[i] * texSamples[i];
     }
-    color = vec4(sharpCol, 1.0);
+    return vec4(sharpCol, 1.0);
 }
 
-void blurColor(inout vec4 color)
+vec4 blurColor()
 {
     float blurKernel[9] = float[](
         1.0 / 16.0, 2.0 / 16.0, 1.0 / 16.0,
@@ -68,10 +68,10 @@ void blurColor(inout vec4 color)
     for(int i = 0; i<9; i++){
         blurCol += blurKernel[i] * texSamples[i];
     }
-    color = vec4(blurCol, 1.0);
+    return vec4(blurCol, 1.0);
 }
 
-void edgeColor(inout vec4 color)
+vec4 edgeColor()
 {
     float edgeKernel[9] = float[](
         1,  1,  1,
@@ -83,13 +83,11 @@ void edgeColor(inout vec4 color)
     texSampler(texSamples);
     for(int i = 0; i<9; i++){
         edgeCol += edgeKernel[i] * texSamples[i];
-    color = vec4(edgeCol, 1.0);
+    return vec4(edgeCol, 1.0);
     }
 }
 
 void main()
 {
-    vec4 color;
-    grayScaleColor(color);
-    FragColor = color;
+    FragColor = grayScaleColor();
 }
