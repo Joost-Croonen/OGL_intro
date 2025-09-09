@@ -11,7 +11,7 @@
 
 #include <iostream>
 
-unsigned int TextureFromFile(const char* path, const std::string &dir) {
+unsigned int TextureFromFile(const char* path, const std::string &dir, bool gamma = false) {
     unsigned int id;
     int width, height, nrChannels;
     // Set image orientation
@@ -26,13 +26,24 @@ unsigned int TextureFromFile(const char* path, const std::string &dir) {
     // Create texture and generate mipmaps for currently bound texture
     if (data) {
         GLenum format;
-        if (nrChannels == 1)
+        GLenum internalFormat;
+        if (nrChannels == 1) {
             format = GL_RED;
-        else if (nrChannels == 3)
+            internalFormat = GL_RED;
+        }
+        else if (nrChannels == 3) {
             format = GL_RGB;
-        else if (nrChannels == 4)
+            internalFormat = GL_RGB;
+            if (gamma)
+                internalFormat = GL_SRGB;
+        }
+        else if (nrChannels == 4) {
             format = GL_RGBA;
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+            internalFormat = GL_RGBA;
+            if (gamma)
+                internalFormat = GL_SRGB_ALPHA;
+        }
+        glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
 
         // Define texture parameters
@@ -57,7 +68,7 @@ public:
 
     Texture() {};
 
-    Texture(const char* path, 
+    Texture(const char* path, bool gamma = false, 
         GLint wrap_s = GL_REPEAT, GLint wrap_t = GL_REPEAT,
         GLint min_filt = GL_LINEAR_MIPMAP_LINEAR, GLint mag_filt = GL_LINEAR) :
         albedoPath(path), samples(1)
@@ -77,13 +88,24 @@ public:
         // Create texture and generate mipmaps for currently bound texture
         if (data) {
             GLenum format;
-            if (nrChannels == 1)
+            GLenum internalFormat;
+            if (nrChannels == 1) {
                 format = GL_RED;
-            else if (nrChannels == 3)
+                internalFormat = GL_RED;
+            }
+            else if (nrChannels == 3) {
                 format = GL_RGB;
-            else if (nrChannels == 4)
+                internalFormat = GL_RGB;
+                if (gamma)
+                    internalFormat = GL_SRGB;
+            }
+            else if (nrChannels == 4) {
                 format = GL_RGBA;
-            glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+                internalFormat = GL_RGBA;
+                if (gamma)
+                    internalFormat = GL_SRGB_ALPHA;
+            }
+            glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL_UNSIGNED_BYTE, data);
             glGenerateMipmap(GL_TEXTURE_2D);
         }
         else {
@@ -119,9 +141,9 @@ public:
     void activate(Shader shader, const char* name, GLenum texture_unit) const
     {
         glActiveTexture(texture_unit);
-        glBindTexture(GL_TEXTURE_2D, id);
         shader.use();
         shader.setInt(name, texture_unit);
+        glBindTexture(GL_TEXTURE_2D, id);
     }
 
     void attach(GLenum attachement) const
@@ -184,8 +206,9 @@ public:
     void activate(Shader shader, const char* name, GLenum texture_unit) const
     {
         glActiveTexture(texture_unit);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, id);
+        shader.use();
         shader.setInt(name, texture_unit);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, id);
     }
 
 private:

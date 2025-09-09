@@ -11,7 +11,9 @@ public:
 	std::vector<Mesh> meshes;
 	std::string directory;
 	std::vector<TextureData> textures_loaded;
-	Model(const char* path) {
+	bool gammaCorrection;
+	Model(const char* path, bool gamma = false): gammaCorrection(gamma)
+	{
 		loadModel(path);
 	}
 	void Draw(Shader &shader){
@@ -129,7 +131,11 @@ private:
 			}
 			if (!skip) {
 				TextureData texture;
-				texture.id = TextureFromFile(str.C_Str(), this->directory);
+				bool gamma = false;
+				if (this->gammaCorrection && ((typeName == "texture_diffuse") || (typeName == "texture_specular"))){
+					gamma = true;
+				}
+				texture.id = TextureFromFile(str.C_Str(), this->directory, gamma);
 				texture.type = typeName;
 				texture.path = str.C_Str();
 				textures.push_back(texture);

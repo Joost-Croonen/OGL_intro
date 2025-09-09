@@ -81,18 +81,49 @@ int base_scene() {
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetCursorPosCallback(window, mouse_callback);
 
-    // Setup geometry, textures, buffers and shaders
+
+    // OGL state setup --------------------------------------------------
+    // Depht test
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    // Stencil testing
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    // Face culling
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    // Blending
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // MSAA
+    glEnable(GL_MULTISAMPLE);
+
+    // Gamma correction
+    glEnable(GL_FRAMEBUFFER_SRGB);
+
+    // Wireframe mode
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+
+    // Setup geometry, textures, buffers and shaders --------------------
     // Vertices
     float planeVertices[] = {
         // positions            // normals         // texcoords
-         10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,  10.0f,  0.0f,
-         10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,
-        -10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,   0.0f, 10.0f,
+         10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,  10.0f,  0.0f,    //3
+        -10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,   0.0f, 10.0f,    //0
+        -10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,    //1
 
-         10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,  10.0f,  0.0f,
-        -10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,   0.0f, 10.0f,
-        -10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,  10.0f, 10.0f
+         10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,  10.0f,  0.0f,    //3
+         10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,  10.0f, 10.0f,    //2
+        -10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,   0.0f, 10.0f     //0
     };
+
 
     // Buffer objects
     VAO planeVAO = VAO();
@@ -110,36 +141,12 @@ int base_scene() {
     ourShader.setMat4("projection", projection);
 
     // Model
-    //Model ourModel("../../../src/models/backpack/backpack.obj");
+    Model ourModel("../../../src/models/backpack/backpack.obj");
 
     // Load other textures
     Texture floorTexture = Texture("../../../src/textures/wood.png");
 
-    // Enable depht test
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-
-    // Face culling
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-    glFrontFace(GL_CCW);
-
-    // MSAA
-    glEnable(GL_MULTISAMPLE);
-
-    // Enable stencil testing
-    //glEnable(GL_STENCIL_TEST);
-    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
-    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-
-    // Enable blending
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    // Enable wireframe mode
-    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-    // Main render loop
+    // Main render loop ---------------------------------------------------
     while (!glfwWindowShouldClose(window))
     {
         // frame time
@@ -159,11 +166,22 @@ int base_scene() {
         glm::mat4 model = glm::mat4(1.0f);
         glm::mat4 view = camera.GetViewMatrix();
 
+        // Floor
         ourShader.use();
         ourShader.setMat4("model", model);
         ourShader.setMat4("view", view);
+        floorTexture.activate(ourShader, "texture_diffuse1", 0);
         planeVAO.bind();
         glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        // Backpack
+        ourShader.use();
+        model = glm::translate(model, glm::vec3(0.0, 0.5, 0.0));
+        model = glm::scale(model, glm::vec3(0.5, 0.5, 0.5));
+        model = glm::rotate(model, glm::radians(0.0f), glm::vec3(0.0, 1.0, 0.0));
+        ourShader.setMat4("model", model);
+        ourShader.setMat4("view", view);
+        ourModel.Draw(ourShader);
 
         // Swap buffers and poll for IO events
         glfwSwapBuffers(window);
@@ -1746,7 +1764,7 @@ int blinn_phong_scene() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_SAMPLES, 1);
+    glfwWindowHint(GLFW_SAMPLES, 4);
 
     // Create and verify window 
     GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
@@ -1781,15 +1799,18 @@ int blinn_phong_scene() {
     // OGL state
     // Depht test
     glEnable(GL_DEPTH_TEST);
-    //glDepthFunc(GL_LESS);
+    glDepthFunc(GL_LESS);
 
     // Face culling
-    // glEnable(GL_CULL_FACE);
-    // glCullFace(GL_BACK);
-    // glFrontFace(GL_CCW);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
 
     // MSAA
-    //glEnable(GL_MULTISAMPLE);
+    glEnable(GL_MULTISAMPLE);
+
+    // Gamma correction
+    glEnable(GL_FRAMEBUFFER_SRGB);
 
     // Stencil testing
     //glEnable(GL_STENCIL_TEST);
@@ -1808,12 +1829,12 @@ int blinn_phong_scene() {
     float planeVertices[] = {
         // positions            // normals         // texcoords
          10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,  10.0f,  0.0f,
-        -10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,
         -10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,   0.0f, 10.0f,
+        -10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,
     
          10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,  10.0f,  0.0f,
-        -10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,   0.0f, 10.0f,
-         10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,  10.0f, 10.0f
+         10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,  10.0f, 10.0f,
+        -10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,   0.0f, 10.0f
     };
 
     // Buffer objects
@@ -1878,9 +1899,230 @@ int blinn_phong_scene() {
     return 0;
 }
 
+int gamma_scene() {
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, 4);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+
+    // OGL state setup --------------------------------------------------
+    // Depht test
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    // Stencil testing
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    // Face culling
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    // Blending
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // MSAA
+    glEnable(GL_MULTISAMPLE);
+
+    // Gamma correction
+    bool gamma = false;
+    glEnable(GL_FRAMEBUFFER_SRGB);
+    gamma = true;
+
+    // Wireframe mode
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+
+    // Setup geometry, textures, buffers and shaders --------------------
+    // Vertices
+    float planeVertices[] = {
+        // positions            // normals         // texcoords
+         10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,  10.0f,  0.0f,    //3
+        -10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,   0.0f, 10.0f,    //0
+        -10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,    //1
+
+         10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,  10.0f,  0.0f,    //3
+         10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,  10.0f, 10.0f,    //2
+        -10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,   0.0f, 10.0f     //0
+    };
+
+    float screenVertices[] = {   // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
+        // positions   // texCoords
+        -1.0f,  1.0f,  0.0f, 1.0f,
+        -1.0f, -1.0f,  0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f, 0.0f,
+
+        -1.0f,  1.0f,  0.0f, 1.0f,
+         1.0f, -1.0f,  1.0f, 0.0f,
+         1.0f,  1.0f,  1.0f, 1.0f
+    };
+
+    // Buffer objects
+    // floor
+    VAO planeVAO = VAO();
+    VBO planeVBO = VBO(planeVertices, sizeof(planeVertices));
+    planeVAO.bind();
+    planeVAO.linkVBO(planeVBO);
+    planeVAO.setAttributes(3, 3, 2);
+    planeVAO.unbind();
+
+    // screen
+    VAO screenVAO = VAO();
+    VBO screenVBO = VBO(screenVertices, sizeof(screenVertices));
+    screenVAO.bind();
+    screenVAO.linkVBO(screenVBO);
+    screenVAO.setAttributes(2, 0, 2);
+    screenVAO.unbind();
+
+    // Frame buffers
+    // main render
+    FBO multisampleFrameBuffer = FBO();
+    multisampleFrameBuffer.bind();
+    Texture multiSampleBufferTexture = Texture(SCR_WIDTH, SCR_HEIGHT, GL_RGB, 4);
+    multiSampleBufferTexture.attach(GL_COLOR_ATTACHMENT0);
+    RBO rbo = RBO(SCR_WIDTH, SCR_HEIGHT, GL_DEPTH24_STENCIL8, 4);
+    rbo.attach(GL_DEPTH_STENCIL_ATTACHMENT);
+    multisampleFrameBuffer.check_status();
+    multisampleFrameBuffer.unbind();
+    // post process
+    FBO postProcessFrameBuffer = FBO();
+    postProcessFrameBuffer.bind();
+    Texture screenBufferTexture = Texture(SCR_WIDTH, SCR_HEIGHT, GL_RGB);
+    screenBufferTexture.attach(GL_COLOR_ATTACHMENT0);
+    postProcessFrameBuffer.check_status();
+    postProcessFrameBuffer.unbind();
+
+    // Shaders
+    Shader ourShader("../../../src/shaders/vertex.vert", "../../../src/shaders/blinn_phong.frag");
+    Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
+
+    ourShader.use();
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    ourShader.setMat4("projection", projection);
+    ourShader.setFloat("material.shininess", 64.0);
+
+    // Model
+    Model ourModel("../../../src/models/backpack/backpack.obj", gamma);
+
+    // Load other textures
+    Texture floorTexture = Texture("../../../src/textures/wood.png", gamma);
+
+    // Lights
+    ourShader.use();
+    ourShader.setVec3 ("light.position", glm::vec3(0.0, 1.5, 1.0));
+    ourShader.setFloat("light.constant", 1.0);
+    ourShader.setFloat("light.linear", 0.09);
+    ourShader.setFloat("light.quadratic", 0.032);
+    if (gamma) {
+
+        ourShader.setFloat("light.constant", 0.0);
+        ourShader.setFloat("light.linear", 0.0);
+        ourShader.setFloat("light.quadratic", 1.0);
+    }
+
+    // Main render loop ---------------------------------------------------
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+        // 1. render to texture
+        multisampleFrameBuffer.bind(); 
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
+
+        // Draw
+        glm::mat4 model = glm::mat4(1.0f);
+        glm::mat4 view = camera.GetViewMatrix();
+
+        // Floor
+        ourShader.use();
+        ourShader.setMat4("model", model);
+        ourShader.setMat4("view", view);
+        ourShader.setVec3("viewPos", camera.Position);
+        floorTexture.activate(ourShader, "material.texture_diffuse1", GL_TEXTURE0);
+        floorTexture.activate(ourShader, "material.texture_specular1", GL_TEXTURE1);
+        planeVAO.bind();
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        // Backpack
+        ourShader.use();
+        model = glm::translate(model, glm::vec3(0.0, 0.5, 0.0));
+        model = glm::scale(model, glm::vec3(0.5, 0.5, 0.5));
+        model = glm::rotate(model, glm::radians(0.0f), glm::vec3(0.0, 1.0, 0.0));
+        ourShader.setMat4("model", model);
+        ourShader.setMat4("view", view);
+        ourShader.setVec3("viewPos", camera.Position);
+        ourModel.Draw(ourShader);
+
+        // 2. Texture to screen
+        multisampleFrameBuffer.blit(SCR_WIDTH, SCR_HEIGHT, postProcessFrameBuffer.id);
+        multisampleFrameBuffer.unbind();
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glDisable(GL_DEPTH_TEST);
+
+        screenShader.use();
+        screenBufferTexture.activate(screenShader, "screenTexture", GL_TEXTURE0);
+        screenVAO.bind();
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Terminate
+    planeVAO.Delete();
+    planeVBO.Delete();
+    glfwTerminate();
+    return 0;
+}
+
 int main(void)
 {
-    switch (0)
+    switch (9)
     {
     case 0: return base_scene(); break;
     case 1: return main_scene(); break;
@@ -1891,6 +2133,7 @@ int main(void)
     case 6: return asteroid_scene(); break;
     case 7: return msaa_scene(); break;
     case 8: return blinn_phong_scene(); break;
+    case 9: return gamma_scene(); break;
     }
 }
 

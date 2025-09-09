@@ -39,6 +39,13 @@ vec4 grayScaleColor()
     return vec4(average, average, average, 1.0);
 }
 
+vec4 gammaColor()
+{
+    vec4 texColor = texture(screenTexture, TexCoords);
+    float gamma = 2.2;
+    return vec4(pow(texColor.rgb, vec3(1.0/gamma)), 1.0);
+}
+
 vec4 sharpenColor()
 {
     float sharpKernel[9] = float[](
@@ -89,5 +96,5 @@ vec4 edgeColor()
 
 void main()
 {
-    FragColor = grayScaleColor();
+    FragColor = vec4(texture(screenTexture, TexCoords).rgb, 1.0);
 }
