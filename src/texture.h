@@ -11,7 +11,7 @@
 
 #include <iostream>
 
-unsigned int TextureFromFile(const char* path, const std::string &dir, bool gamma = false) {
+unsigned int TextureFromFile(const char* path, const std::string &dir, bool gamma_correct = false) {
     unsigned int id;
     int width, height, nrChannels;
     // Set image orientation
@@ -33,15 +33,11 @@ unsigned int TextureFromFile(const char* path, const std::string &dir, bool gamm
         }
         else if (nrChannels == 3) {
             format = GL_RGB;
-            internalFormat = GL_RGB;
-            if (gamma)
-                internalFormat = GL_SRGB;
+            internalFormat = gamma_correct ? GL_SRGB : GL_RGB;
         }
         else if (nrChannels == 4) {
             format = GL_RGBA;
-            internalFormat = GL_RGBA;
-            if (gamma)
-                internalFormat = GL_SRGB_ALPHA;
+            internalFormat = gamma_correct ? GL_SRGB_ALPHA: GL_RGBA;
         }
         glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
@@ -68,7 +64,7 @@ public:
 
     Texture() {};
 
-    Texture(const char* path, bool gamma = false, 
+    Texture(const char* path, bool gamma_correct = false, 
         GLint wrap_s = GL_REPEAT, GLint wrap_t = GL_REPEAT,
         GLint min_filt = GL_LINEAR_MIPMAP_LINEAR, GLint mag_filt = GL_LINEAR) :
         albedoPath(path), samples(1)
@@ -96,14 +92,11 @@ public:
             else if (nrChannels == 3) {
                 format = GL_RGB;
                 internalFormat = GL_RGB;
-                if (gamma)
-                    internalFormat = GL_SRGB;
+                internalFormat = gamma_correct ? GL_SRGB : GL_RGB;
             }
             else if (nrChannels == 4) {
                 format = GL_RGBA;
-                internalFormat = GL_RGBA;
-                if (gamma)
-                    internalFormat = GL_SRGB_ALPHA;
+                internalFormat = gamma_correct ? GL_SRGB_ALPHA : GL_RGBA;
             }
             glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL_UNSIGNED_BYTE, data);
             glGenerateMipmap(GL_TEXTURE_2D);
@@ -116,15 +109,16 @@ public:
         glActiveTexture(GL_TEXTURE0);
 	}
 
-    Texture(unsigned int width, unsigned int height, GLenum format, 
+    Texture(unsigned int width, unsigned int height, GLenum internalFormat,
         unsigned int samples = 1, GLint min_filt=GL_LINEAR, GLint mag_filt=GL_LINEAR) :
         albedoPath(""), width(width), height(height), samples(samples)
     {
+        GLenum dataFormat = GL_RGB;
         glGenTextures(1, &id);
         if (samples == 1)
         {
             glBindTexture(GL_TEXTURE_2D, id);
-            glTexImage2D(GL_TEXTURE_2D, 0, format, this->width, this->height, 0, format, GL_UNSIGNED_BYTE, NULL);
+            glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, this->width, this->height, 0, dataFormat, GL_UNSIGNED_BYTE, NULL);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filt);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filt);
             glBindTexture(GL_TEXTURE_2D, 0);
@@ -132,7 +126,7 @@ public:
         else 
         {
             glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, id);
-            glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, samples, format, this->width, this->height, GL_TRUE);
+            glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, samples, internalFormat, this->width, this->height, GL_TRUE);
             glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, 0);
         }
         

@@ -132,7 +132,7 @@ private:
 			if (!skip) {
 				TextureData texture;
 				bool gamma = false;
-				if (this->gammaCorrection && ((typeName == "texture_diffuse") || (typeName == "texture_specular"))){
+				if (this->gammaCorrection && (typeName == "texture_diffuse")){
 					gamma = true;
 				}
 				texture.id = TextureFromFile(str.C_Str(), this->directory, gamma);

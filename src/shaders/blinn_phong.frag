@@ -12,30 +12,44 @@ struct Material{
 
 struct PointLight{
     vec3 position;
+    vec3 color;
 
     float constant;
     float linear;
     float quadratic;
 };
 
+#define MAX_LIGHTS 10 
 uniform Material material;
-uniform PointLight light;
+uniform PointLight light[MAX_LIGHTS];
 uniform vec3 viewPos;
+uniform int num_lights;
 
-void main()
+vec4 calc_light(int index)
 {
     vec3 diffuseColor = texture(material.texture_diffuse1, TexCoord).rgb;
     vec3 specularColor = texture(material.texture_specular1, TexCoord).rgb;
     // attentunation
-    float dist = length(light.position - FragPos);
-    float attentunation = 1.0 / (light.constant + light.linear * dist + light.quadratic * dist * dist);
+    float dist = length(light[index].position - FragPos);
+    float attentunation = 1.0 / (light[index].constant + light[index].linear * dist + light[index].quadratic * dist * dist);
     // diffuse
     vec3 norm = normalize(Normal);
-    vec3 lightDir = normalize(light.position - FragPos);
+    vec3 lightDir = normalize(light[index].position - FragPos);
     vec3 diffuse = max(dot(lightDir, norm), 0.0) * diffuseColor;
     // specular
     vec3 viewDir = normalize(viewPos - FragPos);
     vec3 halfVec = normalize(lightDir + viewDir);
     vec3 specular = pow(max(dot(norm, halfVec), 0.0), material.shininess) * specularColor;
-    FragColor = vec4(attentunation * (diffuse + specular), 1.0);
+
+    return vec4(attentunation * (diffuse + specular) * light[index].color, 1.0);
+}
+
+void main()
+{
+    vec4 color = vec4(0);
+    for(int i = 0; i < min(num_lights, MAX_LIGHTS); ++i)
+        color += calc_light(i);
+    //float gamma = 2.2;
+    //color = vec4(pow(color.rgb, vec3(1.0/gamma)), 1.0);
+    FragColor = color;
 }

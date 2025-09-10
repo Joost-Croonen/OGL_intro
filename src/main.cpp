@@ -105,7 +105,8 @@ int base_scene() {
     glEnable(GL_MULTISAMPLE);
 
     // Gamma correction
-    glEnable(GL_FRAMEBUFFER_SRGB);
+    bool gamma_correct = false;
+    if(gamma_correct) glEnable(GL_FRAMEBUFFER_SRGB);
 
     // Wireframe mode
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -141,10 +142,10 @@ int base_scene() {
     ourShader.setMat4("projection", projection);
 
     // Model
-    Model ourModel("../../../src/models/backpack/backpack.obj");
+    Model ourModel("../../../src/models/backpack/backpack.obj", gamma_correct);
 
     // Load other textures
-    Texture floorTexture = Texture("../../../src/textures/wood.png");
+    Texture floorTexture = Texture("../../../src/textures/wood.png", gamma_correct);
 
     // Main render loop ---------------------------------------------------
     while (!glfwWindowShouldClose(window))
@@ -1659,6 +1660,8 @@ int msaa_scene() {
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 1000.0f);
     simpleShader.setMat4("projection", projection);
     simpleShader.setVec3("color", 0.0, 1.0, 0.0);
+    screenShader.use();
+    screenShader.setFloat("gamma", 1.0f);
 
     // Model
     //Model ourModel("../../../src/models/backpack/backpack.obj");
@@ -1810,7 +1813,7 @@ int blinn_phong_scene() {
     glEnable(GL_MULTISAMPLE);
 
     // Gamma correction
-    glEnable(GL_FRAMEBUFFER_SRGB);
+    //glEnable(GL_FRAMEBUFFER_SRGB);
 
     // Stencil testing
     //glEnable(GL_STENCIL_TEST);
@@ -1851,13 +1854,34 @@ int blinn_phong_scene() {
     ourShader.use();
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
     ourShader.setMat4("projection", projection);
-    ourShader.setVec3("lightPos", 0.0, 0.0, 0.0);
+    ourShader.setFloat("material.shininess", 64.0);
 
     // Model
     //Model ourModel("../../../src/models/backpack/backpack.obj");
 
     // Load other textures
-    Texture floorTexture = Texture("../../../src/textures/wood.png");
+    Texture floorTexture = Texture("../../../src/textures/wood.png", false);
+
+    // Lights
+    glm::vec3 lightPositions[] = {
+        glm::vec3(0.0f, 0.0f, 0.5f)
+    };
+    glm::vec3 lightColors[] = {
+        glm::vec3(1.0f)
+    };
+    int num_lights = sizeof(lightPositions) / sizeof(lightPositions[0]);
+    ourShader.use();
+    ourShader.setInt("num_lights", num_lights);
+    for (int i = 0; i < num_lights; i++) {
+        ourShader.setVec3("light[" + std::to_string(i) + "].position", lightPositions[i]);
+        ourShader.setVec3("light[" + std::to_string(i) + "].color", lightColors[i]);
+        ourShader.setFloat("light[" + std::to_string(i) + "].constant", 1.0);
+        ourShader.setFloat("light[" + std::to_string(i) + "].linear", 0.09);
+        ourShader.setFloat("light[" + std::to_string(i) + "].quadratic", 0.032);
+        //ourShader.setFloat("light[" + std::to_string(i) + "].constant", 0.0);
+        //ourShader.setFloat("light[" + std::to_string(i) + "].linear", 0.0);
+        //ourShader.setFloat("light[" + std::to_string(i) + "].quadratic", 1.0);
+    }
 
     // Main render loop
     while (!glfwWindowShouldClose(window))
@@ -1883,7 +1907,8 @@ int blinn_phong_scene() {
         ourShader.setMat4("view", view);
         ourShader.setVec3("viewPos", camera.Position);
 
-        floorTexture.activate(ourShader, "texture_diffuse1", 0);
+        floorTexture.activate(ourShader, "material.texture_diffuse1", 0);
+        floorTexture.activate(ourShader, "material.texture_specular1", 0);
 
         planeVAO.bind();
         glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -1907,7 +1932,7 @@ int gamma_scene() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_SAMPLES, 4);
+    glfwWindowHint(GLFW_SAMPLES, 1); 
 
     // Create and verify window 
     GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
@@ -1957,12 +1982,12 @@ int gamma_scene() {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     // MSAA
-    glEnable(GL_MULTISAMPLE);
+    //glEnable(GL_MULTISAMPLE);
 
     // Gamma correction
-    bool gamma = false;
-    glEnable(GL_FRAMEBUFFER_SRGB);
-    gamma = true;
+    //glEnable(GL_FRAMEBUFFER_SRGB);
+    float gamma = 2.2f;
+    bool gamma_correct = (gamma != 1.0);
 
     // Wireframe mode
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -1972,13 +1997,13 @@ int gamma_scene() {
     // Vertices
     float planeVertices[] = {
         // positions            // normals         // texcoords
-         10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,  10.0f,  0.0f,    //3
-        -10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,   0.0f, 10.0f,    //0
-        -10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,    //1
+         10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,  10.0f,  0.0f,
+        -10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,   0.0f, 10.0f,
+        -10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,
 
-         10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,  10.0f,  0.0f,    //3
-         10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,  10.0f, 10.0f,    //2
-        -10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,   0.0f, 10.0f     //0
+         10.0f, -0.5f,  10.0f,  0.0f, 1.0f, 0.0f,  10.0f,  0.0f, 
+         10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,  10.0f, 10.0f, 
+        -10.0f, -0.5f, -10.0f,  0.0f, 1.0f, 0.0f,   0.0f, 10.0f 
     };
 
     float screenVertices[] = {   // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
@@ -2013,7 +2038,7 @@ int gamma_scene() {
     // main render
     FBO multisampleFrameBuffer = FBO();
     multisampleFrameBuffer.bind();
-    Texture multiSampleBufferTexture = Texture(SCR_WIDTH, SCR_HEIGHT, GL_RGB, 4);
+    Texture multiSampleBufferTexture = Texture(SCR_WIDTH, SCR_HEIGHT, GL_RGB16, 4);
     multiSampleBufferTexture.attach(GL_COLOR_ATTACHMENT0);
     RBO rbo = RBO(SCR_WIDTH, SCR_HEIGHT, GL_DEPTH24_STENCIL8, 4);
     rbo.attach(GL_DEPTH_STENCIL_ATTACHMENT);
@@ -2022,7 +2047,7 @@ int gamma_scene() {
     // post process
     FBO postProcessFrameBuffer = FBO();
     postProcessFrameBuffer.bind();
-    Texture screenBufferTexture = Texture(SCR_WIDTH, SCR_HEIGHT, GL_RGB);
+    Texture screenBufferTexture = Texture(SCR_WIDTH, SCR_HEIGHT, GL_RGB16);
     screenBufferTexture.attach(GL_COLOR_ATTACHMENT0);
     postProcessFrameBuffer.check_status();
     postProcessFrameBuffer.unbind();
@@ -2035,25 +2060,47 @@ int gamma_scene() {
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
     ourShader.setMat4("projection", projection);
     ourShader.setFloat("material.shininess", 64.0);
+    screenShader.use();
+    screenShader.setFloat("gamma", gamma);
 
     // Model
-    Model ourModel("../../../src/models/backpack/backpack.obj", gamma);
+    Model ourModel("../../../src/models/backpack/backpack.obj", gamma_correct);
 
     // Load other textures
-    Texture floorTexture = Texture("../../../src/textures/wood.png", gamma);
+    Texture floorTexture = Texture("../../../src/textures/wood.png", gamma_correct);
 
     // Lights
+    glm::vec3 lightPositions[] = {
+        glm::vec3(-3.0f, 0.0f, 0.5f),
+        glm::vec3(-1.0f, 0.0f, 0.5f),
+        glm::vec3( 1.0f, 0.0f, 0.5f),
+        glm::vec3( 3.0f, 0.0f, 0.5f)
+    }; 
+    glm::vec3 lightColors[] = {
+        glm::vec3(0.25f),
+        glm::vec3(0.5f),
+        glm::vec3(0.75f),
+        glm::vec3(1.0f)
+    };
+    int num_lights = sizeof(lightPositions) / sizeof(lightPositions[0]);
     ourShader.use();
-    ourShader.setVec3 ("light.position", glm::vec3(0.0, 1.5, 1.0));
-    ourShader.setFloat("light.constant", 1.0);
-    ourShader.setFloat("light.linear", 0.09);
-    ourShader.setFloat("light.quadratic", 0.032);
-    if (gamma) {
+    ourShader.setInt("num_lights", num_lights);
+    for (int i = 0; i < num_lights; i++) {
+        ourShader.setVec3("light[" + std::to_string(i) + "].position", lightPositions[i]);
+        ourShader.setVec3("light[" + std::to_string(i) + "].color", lightColors[i]);
+        ourShader.setFloat("light[" + std::to_string(i) + "].constant", 1.0);
+        ourShader.setFloat("light[" + std::to_string(i) + "].linear", 0.09);
+        ourShader.setFloat("light[" + std::to_string(i) + "].quadratic", 0.032);
+        if (gamma_correct) {
 
-        ourShader.setFloat("light.constant", 0.0);
-        ourShader.setFloat("light.linear", 0.0);
-        ourShader.setFloat("light.quadratic", 1.0);
+            ourShader.setFloat("light[" + std::to_string(i) + "].constant", 0.0);
+            ourShader.setFloat("light[" + std::to_string(i) + "].linear", 0.0);
+            ourShader.setFloat("light[" + std::to_string(i) + "].quadratic", 1.0);
+        }
     }
+    // Background
+    glm::vec3 clear_color = glm::vec3(pow(0.1, gamma));
+    std::cout << std::to_string(clear_color.r) << std::endl; 
 
     // Main render loop ---------------------------------------------------
     while (!glfwWindowShouldClose(window))
@@ -2069,7 +2116,7 @@ int gamma_scene() {
         // Rendering
         // 1. render to texture
         multisampleFrameBuffer.bind(); 
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClearColor(clear_color.r, clear_color.g, clear_color.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
 
@@ -2100,10 +2147,11 @@ int gamma_scene() {
         // 2. Texture to screen
         multisampleFrameBuffer.blit(SCR_WIDTH, SCR_HEIGHT, postProcessFrameBuffer.id);
         multisampleFrameBuffer.unbind();
+        postProcessFrameBuffer.unbind();
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         glDisable(GL_DEPTH_TEST);
-
+        
         screenShader.use();
         screenBufferTexture.activate(screenShader, "screenTexture", GL_TEXTURE0);
         screenVAO.bind();
@@ -2116,6 +2164,10 @@ int gamma_scene() {
     // Terminate
     planeVAO.Delete();
     planeVBO.Delete();
+    ourModel.Delete();
+    multisampleFrameBuffer.Delete();
+    postProcessFrameBuffer.Delete();
+    rbo.Delete();
     glfwTerminate();
     return 0;
 }

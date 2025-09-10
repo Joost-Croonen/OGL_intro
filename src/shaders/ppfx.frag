@@ -5,10 +5,12 @@ in vec2 TexCoords;
 
 uniform sampler2D screenTexture;
 
+uniform float gamma;
+
 const float offset = 1.0/360.0;
     
 
-void texSampler(inout vec3 texSamples[9]) 
+void sreenSampler(inout vec3 sreenSamples[9]) 
 {
     vec2 offsets[9] = vec2[](
         vec2(-offset, offset),
@@ -22,28 +24,27 @@ void texSampler(inout vec3 texSamples[9])
         vec2(offset,  -offset)
     );
     for(int i = 0; i<9; i++){
-        texSamples[i] = vec3(texture(screenTexture, TexCoords.st + offsets[i]));
+        sreenSamples[i] = vec3(texture(screenTexture, TexCoords.st + offsets[i]));
     }
 }
 
 vec4 invertColor()
 {
-    vec4 texColor = texture(screenTexture, TexCoords);
-    return vec4(vec3(1.0-texColor), 1.0);
+    vec4 screenColor = texture(screenTexture, TexCoords);
+    return vec4(vec3(1.0-screenColor), 1.0);
 }
 
 vec4 grayScaleColor()
 {
-    vec4 texColor = texture(screenTexture, TexCoords);
-    float average = ( 0.2126 * texColor.r + 0.7152 * texColor.g + 0.0722 * texColor.b)/3.0;
+    vec4 screenColor = texture(screenTexture, TexCoords);
+    float average = ( 0.2126 * screenColor.r + 0.7152 * screenColor.g + 0.0722 * screenColor.b)/3.0;
     return vec4(average, average, average, 1.0);
 }
 
 vec4 gammaColor()
 {
-    vec4 texColor = texture(screenTexture, TexCoords);
-    float gamma = 2.2;
-    return vec4(pow(texColor.rgb, vec3(1.0/gamma)), 1.0);
+    vec4 screenColor = texture(screenTexture, TexCoords);
+    return vec4(pow(screenColor.rgb, vec3(1.0/gamma)), 1.0);
 }
 
 vec4 sharpenColor()
@@ -54,10 +55,10 @@ vec4 sharpenColor()
         -1, -1, -1
     );
     vec3 sharpCol = vec3(0.0);
-    vec3 texSamples[9];
-    texSampler(texSamples);
+    vec3 sreenSamples[9];
+    sreenSampler(sreenSamples);
     for(int i = 0; i<9; i++){
-        sharpCol += sharpKernel[i] * texSamples[i];
+        sharpCol += sharpKernel[i] * sreenSamples[i];
     }
     return vec4(sharpCol, 1.0);
 }
@@ -70,10 +71,10 @@ vec4 blurColor()
         1.0 / 16.0, 2.0 / 16.0, 1.0 / 16.0
     );
     vec3 blurCol = vec3(0.0);
-    vec3 texSamples[9];
-    texSampler(texSamples);
+    vec3 sreenSamples[9];
+    sreenSampler(sreenSamples);
     for(int i = 0; i<9; i++){
-        blurCol += blurKernel[i] * texSamples[i];
+        blurCol += blurKernel[i] * sreenSamples[i];
     }
     return vec4(blurCol, 1.0);
 }
@@ -86,15 +87,16 @@ vec4 edgeColor()
         1,  1,  1
     );
     vec3 edgeCol = vec3(0.0);
-    vec3 texSamples[9];
-    texSampler(texSamples);
+    vec3 sreenSamples[9];
+    sreenSampler(sreenSamples);
     for(int i = 0; i<9; i++){
-        edgeCol += edgeKernel[i] * texSamples[i];
+        edgeCol += edgeKernel[i] * sreenSamples[i];
     return vec4(edgeCol, 1.0);
     }
 }
 
 void main()
 {
-    FragColor = vec4(texture(screenTexture, TexCoords).rgb, 1.0);
+    //FragColor = vec4(texture(screenTexture, TexCoords).rgb, 1.0);
+    FragColor = gammaColor();
 }
