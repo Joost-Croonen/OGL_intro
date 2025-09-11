@@ -2053,18 +2053,18 @@ int gamma_scene() {
     postProcessFrameBuffer.unbind();
 
     // Shaders
-    Shader ourShader("../../../src/shaders/vertex.vert", "../../../src/shaders/blinn_phong.frag");
+    Shader bpShader("../../../src/shaders/vertex.vert", "../../../src/shaders/blinn_phong.frag");
     Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
 
-    ourShader.use();
+    bpShader.use();
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-    ourShader.setMat4("projection", projection);
-    ourShader.setFloat("material.shininess", 64.0);
+    bpShader.setMat4("projection", projection);
+    bpShader.setFloat("material.shininess", 64.0);
     screenShader.use();
     screenShader.setFloat("gamma", gamma);
 
     // Model
-    Model ourModel("../../../src/models/backpack/backpack.obj", gamma_correct);
+    Model backpackModel("../../../src/models/backpack/backpack.obj", gamma_correct);
 
     // Load other textures
     Texture floorTexture = Texture("../../../src/textures/wood.png", gamma_correct);
@@ -2083,20 +2083,12 @@ int gamma_scene() {
         glm::vec3(1.0f)
     };
     int num_lights = sizeof(lightPositions) / sizeof(lightPositions[0]);
-    ourShader.use();
-    ourShader.setInt("num_lights", num_lights);
+    bpShader.use();
+    bpShader.setInt("num_lights", num_lights);
     for (int i = 0; i < num_lights; i++) {
-        ourShader.setVec3("light[" + std::to_string(i) + "].position", lightPositions[i]);
-        ourShader.setVec3("light[" + std::to_string(i) + "].color", lightColors[i]);
-        ourShader.setFloat("light[" + std::to_string(i) + "].constant", 1.0);
-        ourShader.setFloat("light[" + std::to_string(i) + "].linear", 0.09);
-        ourShader.setFloat("light[" + std::to_string(i) + "].quadratic", 0.032);
-        if (gamma_correct) {
-
-            ourShader.setFloat("light[" + std::to_string(i) + "].constant", 0.0);
-            ourShader.setFloat("light[" + std::to_string(i) + "].linear", 0.0);
-            ourShader.setFloat("light[" + std::to_string(i) + "].quadratic", 1.0);
-        }
+        bpShader.setVec3("light[" + std::to_string(i) + "].position", lightPositions[i]);
+        bpShader.setVec3("light[" + std::to_string(i) + "].color", lightColors[i]);
+        bpShader.setFloat("light[" + std::to_string(i) + "].attenuation_power", gamma_correct ? 2.0 : 1.0);
     }
     // Background
     glm::vec3 clear_color = glm::vec3(pow(0.1, gamma));
@@ -2125,24 +2117,24 @@ int gamma_scene() {
         glm::mat4 view = camera.GetViewMatrix();
 
         // Floor
-        ourShader.use();
-        ourShader.setMat4("model", model);
-        ourShader.setMat4("view", view);
-        ourShader.setVec3("viewPos", camera.Position);
-        floorTexture.activate(ourShader, "material.texture_diffuse1", GL_TEXTURE0);
-        floorTexture.activate(ourShader, "material.texture_specular1", GL_TEXTURE1);
+        bpShader.use();
+        bpShader.setMat4("model", model);
+        bpShader.setMat4("view", view);
+        bpShader.setVec3("viewPos", camera.Position);
+        floorTexture.activate(bpShader, "material.texture_diffuse1", GL_TEXTURE0);
+        floorTexture.activate(bpShader, "material.texture_specular1", GL_TEXTURE1);
         planeVAO.bind();
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         // Backpack
-        ourShader.use();
+        bpShader.use();
         model = glm::translate(model, glm::vec3(0.0, 0.5, 0.0));
         model = glm::scale(model, glm::vec3(0.5, 0.5, 0.5));
         model = glm::rotate(model, glm::radians(0.0f), glm::vec3(0.0, 1.0, 0.0));
-        ourShader.setMat4("model", model);
-        ourShader.setMat4("view", view);
-        ourShader.setVec3("viewPos", camera.Position);
-        ourModel.Draw(ourShader);
+        bpShader.setMat4("model", model);
+        bpShader.setMat4("view", view);
+        bpShader.setVec3("viewPos", camera.Position);
+        backpackModel.Draw(bpShader);
 
         // 2. Texture to screen
         multisampleFrameBuffer.blit(SCR_WIDTH, SCR_HEIGHT, postProcessFrameBuffer.id);
@@ -2164,7 +2156,7 @@ int gamma_scene() {
     // Terminate
     planeVAO.Delete();
     planeVBO.Delete();
-    ourModel.Delete();
+    backpackModel.Delete();
     multisampleFrameBuffer.Delete();
     postProcessFrameBuffer.Delete();
     rbo.Delete();

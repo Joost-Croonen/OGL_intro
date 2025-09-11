@@ -13,10 +13,7 @@ struct Material{
 struct PointLight{
     vec3 position;
     vec3 color;
-
-    float constant;
-    float linear;
-    float quadratic;
+    float attenuation_power;
 };
 
 #define MAX_LIGHTS 10 
@@ -31,7 +28,7 @@ vec4 calc_light(int index)
     vec3 specularColor = texture(material.texture_specular1, TexCoord).rgb;
     // attentunation
     float dist = length(light[index].position - FragPos);
-    float attentunation = 1.0 / (light[index].constant + light[index].linear * dist + light[index].quadratic * dist * dist);
+    float attenuation = 1.0 / pow(dist, light[index].attenuation_power);
     // diffuse
     vec3 norm = normalize(Normal);
     vec3 lightDir = normalize(light[index].position - FragPos);
@@ -41,7 +38,7 @@ vec4 calc_light(int index)
     vec3 halfVec = normalize(lightDir + viewDir);
     vec3 specular = pow(max(dot(norm, halfVec), 0.0), material.shininess) * specularColor;
 
-    return vec4(attentunation * (diffuse + specular) * light[index].color, 1.0);
+    return vec4(attenuation * (diffuse + specular) * light[index].color, 1.0);
 }
 
 void main()
