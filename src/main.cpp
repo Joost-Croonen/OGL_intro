@@ -21,6 +21,7 @@
 #include "texture.h"
 #include "mesh.h"
 #include "model.h"
+#include "ppo.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
@@ -1425,7 +1426,7 @@ int asteroid_scene() {
     std::size_t vec4size = sizeof(glm::vec4);
     for (unsigned int i = 0; i < rock.meshes.size() ; i++)
     {
-        unsigned int VAO = rock.meshes[i].VAO;
+        unsigned int VAO = rock.meshes[i].VAOid;
         glBindVertexArray(VAO);
         glEnableVertexAttribArray(3);
         glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 4 * vec4size, (void*)0);
@@ -1508,7 +1509,7 @@ int asteroid_scene() {
         glBindTexture(GL_TEXTURE_2D, rock.textures_loaded[0].id);
         for (unsigned int i = 0; i < rock.meshes.size(); i++)
         {
-            glBindVertexArray(rock.meshes[i].VAO);
+            glBindVertexArray(rock.meshes[i].VAOid);
             glDrawElementsInstanced(GL_TRIANGLES, rock.meshes[i].indices.size(), GL_UNSIGNED_INT, 0, amount);
         }
 
@@ -1932,7 +1933,7 @@ int gamma_scene() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_SAMPLES, 1); 
+    glfwWindowHint(GLFW_SAMPLES, 4);
 
     // Create and verify window 
     GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
@@ -2091,8 +2092,7 @@ int gamma_scene() {
         bpShader.setFloat("light[" + std::to_string(i) + "].attenuation_power", gamma_correct ? 2.0 : 1.0);
     }
     // Background
-    glm::vec3 clear_color = glm::vec3(pow(0.1, gamma));
-    std::cout << std::to_string(clear_color.r) << std::endl; 
+    glm::vec3 clear_color = glm::vec3(pow(0.1, gamma)); 
 
     // Main render loop ---------------------------------------------------
     while (!glfwWindowShouldClose(window))
@@ -2164,20 +2164,292 @@ int gamma_scene() {
     return 0;
 }
 
+int quad_cube_test_scene() {
+    // Variable setup
+    const unsigned int MS_SAMPLES = 4;
+
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, MS_SAMPLES);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+
+    // OGL state setup --------------------------------------------------
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    if(MS_SAMPLES>1) glEnable(GL_MULTISAMPLE);
+
+    float gamma = 1.0;
+    bool gamma_correct = (gamma != 1.0);
+    if (gamma_correct) glEnable(GL_FRAMEBUFFER_SRGB);
+
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+
+    // Setup geometry, textures, buffers and shaders --------------------
+    // Vertices
+
+    // Shaders
+    Shader ourShader("../../../src/shaders/simple.vert", "../../../src/shaders/simple.frag");
+    Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/screen.frag");
+
+    ourShader.use();
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    ourShader.setMat4("projection", projection);
+
+    // Load textures
+    Texture wood = Texture("../../../src/textures/wood.png", gamma_correct);
+
+    // Models & meshes
+    Quad quad = Quad(glm::vec2(5.0), 1.0, wood);
+    Cube cube = Cube(glm::vec3(1.0), 1.0, wood);
+
+    // Offscreen rendering setup
+    PPO ppo = PPO(screenShader, SCR_WIDTH, SCR_HEIGHT, MS_SAMPLES);
+
+
+    // Main render loop ---------------------------------------------------
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+        ppo.start_render_to_texture();
+        //fbo.bind();
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
+
+        // Draw
+        glm::mat4 model = glm::mat4(1.0f);
+        glm::mat4 view = camera.GetViewMatrix();
+
+        ourShader.use();
+        ourShader.setMat4("model", model);
+        ourShader.setMat4("view", view);
+        cube.Draw(ourShader);
+
+        model = glm::translate(model, glm::vec3(0.0, -0.5, 0.0));
+        model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
+        ourShader.setMat4("model", model);
+        ourShader.setMat4("view", view);
+        quad.Draw(ourShader);
+
+        ppo.draw_texture_to_screen();
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Terminate
+    quad.Delete();
+    cube.Delete();
+    ppo.Delete();
+    glfwTerminate();
+    return 0;
+}
+
+int shadow_scene() {
+    // Variable setup
+    const unsigned int MS_SAMPLES = 4;
+
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, MS_SAMPLES);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+
+    // OGL state setup --------------------------------------------------
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    if (MS_SAMPLES > 1) glEnable(GL_MULTISAMPLE);
+
+    float gamma = 1.0;
+    bool gamma_correct = (gamma != 1.0);
+    if (gamma_correct) glEnable(GL_FRAMEBUFFER_SRGB);
+
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+
+    // Setup geometry, textures, buffers and shaders --------------------
+    // Vertices
+
+    // Shaders
+    Shader ourShader("../../../src/shaders/simple.vert", "../../../src/shaders/simple.frag");
+    Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/screen.frag");
+
+    ourShader.use();
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    ourShader.setMat4("projection", projection);
+
+    // Load textures
+    Texture wood = Texture("../../../src/textures/wood.png", gamma_correct);
+
+    // Models & meshes
+    Quad quad = Quad(glm::vec2(5.0), 1.0, wood);
+    Cube cube = Cube(glm::vec3(1.0), 1.0, wood);
+
+    // Offscreen rendering setup
+    PPO ppo = PPO(screenShader, SCR_WIDTH, SCR_HEIGHT, MS_SAMPLES);
+
+
+    // Main render loop ---------------------------------------------------
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+        ppo.start_render_to_texture();
+        //fbo.bind();
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
+
+        // Draw
+        glm::mat4 model = glm::mat4(1.0f);
+        glm::mat4 view = camera.GetViewMatrix();
+
+        ourShader.use();
+        ourShader.setMat4("model", model);
+        ourShader.setMat4("view", view);
+        cube.Draw(ourShader);
+
+        model = glm::translate(model, glm::vec3(0.0, -0.5, 0.0));
+        model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
+        ourShader.setMat4("model", model);
+        ourShader.setMat4("view", view);
+        quad.Draw(ourShader);
+
+        ppo.draw_texture_to_screen();
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Terminate
+    quad.Delete();
+    cube.Delete();
+    ppo.Delete();
+    glfwTerminate();
+    return 0;
+}
+
 int main(void)
 {
-    switch (9)
+    switch (11)
     {
-    case 0: return base_scene(); break;
-    case 1: return main_scene(); break;
-    case 2: return simple_scene(); break;
-    case 3: return geom_shader_scene(); break;
-    case 4: return norm_vect_scene(); break;
-    case 5: return instancing_scene(); break;
-    case 6: return asteroid_scene(); break;
-    case 7: return msaa_scene(); break;
-    case 8: return blinn_phong_scene(); break;
-    case 9: return gamma_scene(); break;
+    case 0:  return base_scene(); break;
+    case 1:  return main_scene(); break;
+    case 2:  return simple_scene(); break;
+    case 3:  return geom_shader_scene(); break;
+    case 4:  return norm_vect_scene(); break;
+    case 5:  return instancing_scene(); break;
+    case 6:  return asteroid_scene(); break;
+    case 7:  return msaa_scene(); break;
+    case 8:  return blinn_phong_scene(); break;
+    case 9:  return gamma_scene(); break;
+    case 10: return quad_cube_test_scene(); break;
+    case 11: return shadow_scene(); break;
     }
 }
 

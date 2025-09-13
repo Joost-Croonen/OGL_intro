@@ -5,8 +5,7 @@ class RBO
 {
 public:
 	unsigned int id;
-	unsigned int samples;
-	RBO(unsigned int width, unsigned int height, GLenum type, unsigned int samples = 1): samples(samples) {
+	RBO(unsigned int width, unsigned int height, GLenum type, unsigned int samples = 1) {
 		glGenRenderbuffers(1, &id);
 		glBindRenderbuffer(GL_RENDERBUFFER, id);
 		if (samples == 1)

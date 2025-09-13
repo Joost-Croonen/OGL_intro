@@ -51,7 +51,7 @@ unsigned int TextureFromFile(const char* path, const std::string &dir, bool gamm
     else {
         std::cout << "Texture failed to load at path: " << filename << std::endl;
     }
-    // Memory cleanup
+    // Cleanup
     // glActiveTexture(GL_TEXTURE0);
     stbi_image_free(data);
     return id;
@@ -80,7 +80,7 @@ public:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filt);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filt);
         // Load image
-        data = stbi_load(albedoPath, &width, &height, &nrChannels, 0);
+        unsigned char* data = stbi_load(albedoPath, &width, &height, &nrChannels, 0);
         // Create texture and generate mipmaps for currently bound texture
         if (data) {
             GLenum format;
@@ -113,7 +113,9 @@ public:
         unsigned int samples = 1, GLint min_filt=GL_LINEAR, GLint mag_filt=GL_LINEAR) :
         albedoPath(""), width(width), height(height), samples(samples)
     {
-        GLenum dataFormat = GL_RGB;
+        GLenum dataFormat;
+        if (internalFormat == GL_DEPTH_COMPONENT) dataFormat = internalFormat;
+        else dataFormat = GL_RGB;
         glGenTextures(1, &id);
         if (samples == 1)
         {
@@ -148,11 +150,11 @@ public:
             glFramebufferTexture2D(GL_FRAMEBUFFER, attachement, GL_TEXTURE_2D_MULTISAMPLE, id, 0);
     }
 
+    void Delete() { glDeleteTextures(1, &id); }
+
 private:
     int width, height, nrChannels, samples;
     const char* albedoPath;
-    unsigned char* data;
-    
 };
 
 class Cubemap
@@ -177,7 +179,7 @@ public:
         // load data
         for (int i = 0; i < 6; i++) {
             // Load image
-            data = stbi_load(paths[i].c_str(), &width, &height, &nrChannels, 0);
+            unsigned char* data = stbi_load(paths[i].c_str(), &width, &height, &nrChannels, 0);
             // Create texture and generate mipmaps for currently bound texture
             if (data) {
                 GLenum format;
@@ -208,7 +210,6 @@ public:
 private:
     int width, height, nrChannels;
     std::vector<std::string> paths;
-    unsigned char* data;
 };
 
 #endif
