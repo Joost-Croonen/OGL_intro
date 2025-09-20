@@ -23,6 +23,7 @@
 #include "model.h"
 #include "ppo.h"
 
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
@@ -31,9 +32,12 @@ void processInput(GLFWwindow* window);
 // settings
 const unsigned int SCR_WIDTH = 2560;
 const unsigned int SCR_HEIGHT = 1440;
+const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
 const float NEAR_PLANE = 0.1;
 const float FAR_PLANE = 100;
 bool zoom = false;
+bool post_process = false;
+bool post_process_key = false;
 
 // camera
 Camera camera(glm::vec3(1.0f, 1.5f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -100, -20);
@@ -1737,7 +1741,7 @@ int msaa_scene() {
         
         screenShader.use();
         screenVAO.bind();
-        screenBufferTexture.activate(screenShader, "screenTexture", GL_TEXTURE0);
+        screenBufferTexture.activate(screenShader, "screenTexture", 0);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
 
@@ -1761,6 +1765,8 @@ int msaa_scene() {
 }
 
 int blinn_phong_scene() {
+    // Settings
+    int ms_samples = 1;
     // Initialse GLFW
     glfwInit();
 
@@ -1768,7 +1774,7 @@ int blinn_phong_scene() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_SAMPLES, 4);
+    glfwWindowHint(GLFW_SAMPLES, ms_samples);
 
     // Create and verify window 
     GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
@@ -1811,7 +1817,7 @@ int blinn_phong_scene() {
     glFrontFace(GL_CCW);
 
     // MSAA
-    glEnable(GL_MULTISAMPLE);
+    if (ms_samples != 1)glEnable(GL_MULTISAMPLE);
 
     // Gamma correction
     //glEnable(GL_FRAMEBUFFER_SRGB);
@@ -1876,12 +1882,7 @@ int blinn_phong_scene() {
     for (int i = 0; i < num_lights; i++) {
         ourShader.setVec3("light[" + std::to_string(i) + "].position", lightPositions[i]);
         ourShader.setVec3("light[" + std::to_string(i) + "].color", lightColors[i]);
-        ourShader.setFloat("light[" + std::to_string(i) + "].constant", 1.0);
-        ourShader.setFloat("light[" + std::to_string(i) + "].linear", 0.09);
-        ourShader.setFloat("light[" + std::to_string(i) + "].quadratic", 0.032);
-        //ourShader.setFloat("light[" + std::to_string(i) + "].constant", 0.0);
-        //ourShader.setFloat("light[" + std::to_string(i) + "].linear", 0.0);
-        //ourShader.setFloat("light[" + std::to_string(i) + "].quadratic", 1.0);
+        ourShader.setFloat("light[" + std::to_string(i) + "].attenuation_power", 1.0);
     }
 
     // Main render loop
@@ -1909,7 +1910,7 @@ int blinn_phong_scene() {
         ourShader.setVec3("viewPos", camera.Position);
 
         floorTexture.activate(ourShader, "material.texture_diffuse1", 0);
-        floorTexture.activate(ourShader, "material.texture_specular1", 0);
+        floorTexture.activate(ourShader, "material.texture_specular1", 1);
 
         planeVAO.bind();
         glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -1926,6 +1927,8 @@ int blinn_phong_scene() {
 }
 
 int gamma_scene() {
+    // Settings
+    int ms_samples = 4;
     // Initialse GLFW
     glfwInit();
 
@@ -1933,7 +1936,7 @@ int gamma_scene() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_SAMPLES, 4);
+    glfwWindowHint(GLFW_SAMPLES, ms_samples);
 
     // Create and verify window 
     GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
@@ -2039,9 +2042,9 @@ int gamma_scene() {
     // main render
     FBO multisampleFrameBuffer = FBO();
     multisampleFrameBuffer.bind();
-    Texture multiSampleBufferTexture = Texture(SCR_WIDTH, SCR_HEIGHT, GL_RGB16, 4);
+    Texture multiSampleBufferTexture = Texture(SCR_WIDTH, SCR_HEIGHT, GL_RGB16, ms_samples);
     multiSampleBufferTexture.attach(GL_COLOR_ATTACHMENT0);
-    RBO rbo = RBO(SCR_WIDTH, SCR_HEIGHT, GL_DEPTH24_STENCIL8, 4);
+    RBO rbo = RBO(SCR_WIDTH, SCR_HEIGHT, GL_DEPTH24_STENCIL8, ms_samples);
     rbo.attach(GL_DEPTH_STENCIL_ATTACHMENT);
     multisampleFrameBuffer.check_status();
     multisampleFrameBuffer.unbind();
@@ -2121,8 +2124,8 @@ int gamma_scene() {
         bpShader.setMat4("model", model);
         bpShader.setMat4("view", view);
         bpShader.setVec3("viewPos", camera.Position);
-        floorTexture.activate(bpShader, "material.texture_diffuse1", GL_TEXTURE0);
-        floorTexture.activate(bpShader, "material.texture_specular1", GL_TEXTURE1);
+        floorTexture.activate(bpShader, "material.texture_diffuse1", 0);
+        floorTexture.activate(bpShader, "material.texture_specular1", 1);
         planeVAO.bind();
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
@@ -2145,7 +2148,7 @@ int gamma_scene() {
         glDisable(GL_DEPTH_TEST);
         
         screenShader.use();
-        screenBufferTexture.activate(screenShader, "screenTexture", GL_TEXTURE0);
+        screenBufferTexture.activate(screenShader, "screenTexture", 0);
         screenVAO.bind();
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
@@ -2250,7 +2253,6 @@ int quad_cube_test_scene() {
     // Offscreen rendering setup
     PPO ppo = PPO(screenShader, SCR_WIDTH, SCR_HEIGHT, MS_SAMPLES);
 
-
     // Main render loop ---------------------------------------------------
     while (!glfwWindowShouldClose(window))
     {
@@ -2264,7 +2266,6 @@ int quad_cube_test_scene() {
 
         // Rendering
         ppo.start_render_to_texture();
-        //fbo.bind();
         glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -2301,7 +2302,9 @@ int quad_cube_test_scene() {
 
 int shadow_scene() {
     // Variable setup
-    const unsigned int MS_SAMPLES = 4;
+    const unsigned int MS_SAMPLES = 1;
+    float gamma = 1.0;
+    bool gamma_correct = (gamma != 1.0);
 
     // Initialse GLFW
     glfwInit();
@@ -2352,13 +2355,11 @@ int shadow_scene() {
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
 
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    //glEnable(GL_BLEND);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     if (MS_SAMPLES > 1) glEnable(GL_MULTISAMPLE);
 
-    float gamma = 1.0;
-    bool gamma_correct = (gamma != 1.0);
     if (gamma_correct) glEnable(GL_FRAMEBUFFER_SRGB);
 
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -2368,23 +2369,90 @@ int shadow_scene() {
     // Vertices
 
     // Shaders
-    Shader ourShader("../../../src/shaders/simple.vert", "../../../src/shaders/simple.frag");
-    Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/screen.frag");
-
-    ourShader.use();
-    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-    ourShader.setMat4("projection", projection);
+    Shader ourShader("../../../src/shaders/bp_shadows.vert", "../../../src/shaders/bp_shadows.frag");
+    Shader shadowShader("../../../src/shaders/shadow.vert", "../../../src/shaders/shadow.frag");
+    Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
+    Shader depthShader("../../../src/shaders/screen.vert", "../../../src/shaders/depth.frag");
 
     // Load textures
     Texture wood = Texture("../../../src/textures/wood.png", gamma_correct);
 
     // Models & meshes
-    Quad quad = Quad(glm::vec2(5.0), 1.0, wood);
-    Cube cube = Cube(glm::vec3(1.0), 1.0, wood);
+    Model quad = Model(Quad(glm::vec2(50.0), 25.0, wood));
+    Model cube = Model(Cube(glm::vec3(2.0), 1.0, wood));
+    ScreenQuad screen = ScreenQuad();
+
+    glm::vec3 cubePositions[] = {
+        glm::vec3(0.0f, 1.5f, 0.0),
+        glm::vec3(2.0f, 0.0f, 1.0),
+        glm::vec3(-1.0f, 0.0f, 2.0)
+    };
+    glm::vec3 cubeAxis[] = {
+        glm::vec3(0.0f, 1.5f, 0.0),
+        glm::vec3(2.0f, 0.0f, 1.0),
+        glm::vec3(1.0, 0.0, 1.0)
+    }; 
+    float cubeAngle[] = {0.0, 0.0, 60.0};
+    glm::vec3 cubeScale[] = { glm::vec3(0.5), glm::vec3(0.5), glm::vec3(0.25) };
 
     // Offscreen rendering setup
+    // Post processing
     PPO ppo = PPO(screenShader, SCR_WIDTH, SCR_HEIGHT, MS_SAMPLES);
+    // Shadows
+    FBO shadowFBO = FBO();
+    float borderColor[] = {1.0f, 1.0f, 1.0f, 1.0f};
+    Texture shadowMap = Texture(SHADOW_WIDTH, SHADOW_HEIGHT, GL_DEPTH_COMPONENT, 1, 
+        GL_NEAREST, GL_NEAREST, GL_CLAMP_TO_BORDER, GL_CLAMP_TO_BORDER, borderColor);
+    shadowFBO.bind();
+    shadowMap.attach(GL_DEPTH_ATTACHMENT);
+    shadowFBO.set_draw_read_buffer(false);
+    shadowFBO.unbind();
 
+    // Lights
+    glm::vec3 lightPositions[] = {
+        glm::vec3(-2.0f, 4.0f, -1.0f)
+    };
+    glm::vec3 lightColors[] = {
+        glm::vec3(1.0f)
+    };
+    int num_lights = sizeof(lightPositions) / sizeof(lightPositions[0]);
+    ourShader.use();
+    ourShader.setInt("num_lights", num_lights);
+    for (int i = 0; i < num_lights; i++) {
+        ourShader.setVec3("pointLights[" + std::to_string(i) + "].position", lightPositions[i]);
+        ourShader.setVec3("pointLights[" + std::to_string(i) + "].color", lightColors[i]);
+        ourShader.setFloat("pointLights[" + std::to_string(i) + "].attenuation_power", gamma_correct ? 2.0 : 1.0);
+    }
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    ourShader.setMat4("projection", projection);
+    ourShader.setVec3("dirLight.direction", glm::vec3(1.0, 1.0, -1.0));
+    ourShader.setVec3("dirLight.color", glm::vec3(0.0));
+    ourShader.setFloat("material.shininess", 64.0);
+    screenShader.use();
+    screenShader.setFloat("gamma", gamma);
+    // Background
+    glm::vec3 clear_color = glm::vec3(pow(0.1, gamma));
+
+    auto renderScene = [&](Shader shader) {
+        shader.use();
+        glm::mat4 model = glm::mat4(1.0f);
+        // floor
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0, -0.5, 0.0));
+        model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
+        //model = glm::scale(model, glm::vec3(25.0));
+        shader.setMat4("model", model);
+        quad.Draw(shader);
+        // cubes
+        for (int i = 0; i < cubePositions->length(); i++) {
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, cubePositions[i]);
+            model = glm::rotate(model, glm::radians(cubeAngle[i]), glm::normalize(cubeAxis[i]));
+            model = glm::scale(model, cubeScale[i]);
+            shader.setMat4("model", model);
+            cube.Draw(shader);
+        }
+    };
 
     // Main render loop ---------------------------------------------------
     while (!glfwWindowShouldClose(window))
@@ -2398,29 +2466,48 @@ int shadow_scene() {
         processInput(window);
 
         // Rendering
-        ppo.start_render_to_texture();
-        //fbo.bind();
+        // Shadowmap
+        float near_plane = 1.0f, far_plane = 7.5f;
+        glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+        glm::mat4 lightView = glm::lookAt(lightPositions[0], glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+        shadowShader.use();
+        shadowShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+
+        shadowFBO.bind();
+        glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        shadowShader.use();
+        //glCullFace(GL_FRONT);
+        renderScene(shadowShader);
+        //glCullFace(GL_BACK);
+        shadowFBO.unbind();
+
+
+        // Render scene
+        if (post_process) ppo.start_render_to_texture();
         glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClearColor(clear_color.r, clear_color.g, clear_color.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
 
-        // Draw
-        glm::mat4 model = glm::mat4(1.0f);
+        //Draw
         glm::mat4 view = camera.GetViewMatrix();
-
+        
         ourShader.use();
-        ourShader.setMat4("model", model);
+        ourShader.setVec3("viewPos", camera.Position);
         ourShader.setMat4("view", view);
-        cube.Draw(ourShader);
+        ourShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+        wood.activate(ourShader, "texture_diffuse1", 0);
+        shadowMap.activate(ourShader, "shadowMap", 1);
+        
+        renderScene(ourShader);
 
-        model = glm::translate(model, glm::vec3(0.0, -0.5, 0.0));
-        model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
-        ourShader.setMat4("model", model);
-        ourShader.setMat4("view", view);
-        quad.Draw(ourShader);
-
-        ppo.draw_texture_to_screen();
+        if (post_process) ppo.draw_texture_to_screen();
+        
+        //depthShader.use();
+        //shadowMap.activate(depthShader, "depthMap", 0);
+        //screen.Draw();
 
         // Swap buffers and poll for IO events
         glfwSwapBuffers(window);
@@ -2430,6 +2517,7 @@ int shadow_scene() {
     quad.Delete();
     cube.Delete();
     ppo.Delete();
+    shadowFBO.Delete();
     glfwTerminate();
     return 0;
 }
@@ -2474,6 +2562,14 @@ void processInput(GLFWwindow* window)
         camera.ProcessKeyboard(LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         camera.ProcessKeyboard(RIGHT, deltaTime);
+
+    if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS && !post_process_key) {
+        post_process = !post_process;
+        post_process_key = true;
+    }
+    if (glfwGetKey(window, GLFW_KEY_P) == GLFW_RELEASE) {
+        post_process_key = false;
+    }
 }
 
 void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)

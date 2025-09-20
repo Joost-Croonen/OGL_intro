@@ -98,5 +98,6 @@ vec4 edgeColor()
 void main()
 {
     //FragColor = vec4(texture(screenTexture, TexCoords).rgb, 1.0);
-    FragColor = gammaColor();
+    //FragColor = gammaColor();
+    FragColor = grayScaleColor();
 }

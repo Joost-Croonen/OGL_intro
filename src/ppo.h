@@ -40,7 +40,6 @@ public:
         msTexture(      Texture(width, height, GL_RGB16, num_samples)),
         screenTexture(  Texture(width, height, GL_RGB16, 1))
     {
-        vao = VAO();
         vao.bind();
         vao.linkVBO(vbo);
         vao.linkEBO(ebo);
@@ -64,6 +63,7 @@ public:
     void start_render_to_texture() {
         if (multisampling) msfbo.bind();
         else fbo.bind();
+        glEnable(GL_DEPTH_TEST);
     }
 
     void draw_texture_to_screen() {
@@ -75,10 +75,10 @@ public:
         glViewport(0, 0, width, height);
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glDisable(GL_DEPTH_TEST);
+        //glDisable(GL_DEPTH_TEST);     // Why was this here in the first place? 
 
         screenShader.use();
-        screenTexture.activate(screenShader, "screenTexture", GL_TEXTURE0);
+        screenTexture.activate(screenShader, "screenTexture", 0);
         vao.bind();
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         vao.unbind();

@@ -5,7 +5,7 @@ layout (location = 2) in vec2 aTexCoord; // texture coordinates have attribute p
 //layout (location = 3) in vec3 aColor; // the color variable has attribute position 3
 
 //out vec3 ourColor; // output a color to the fragment shader
-out vec2 TexCoord;
+out vec2 TexCoords;
 out vec3 Normal;
 out vec3 FragPos;
 
@@ -18,6 +18,6 @@ void main()
     FragPos = vec3(model * vec4(aPos, 1.0));
     Normal = mat3(transpose(inverse(model))) * aNormal;
     //ourColor = aColor; // set ourColor to the input color we got from the vertex data
-    TexCoord = aTexCoord;
+    TexCoords = aTexCoord;
     gl_Position = projection * view * vec4(FragPos, 1.0);
 }

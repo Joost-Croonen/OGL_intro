@@ -11,10 +11,17 @@ public:
 	std::vector<Mesh> meshes;
 	std::string directory;
 	std::vector<TextureData> textures_loaded;
-	bool gammaCorrection;
+	bool gammaCorrection = false;
 	Model(const char* path, bool gamma = false): gammaCorrection(gamma)
 	{
 		loadModel(path);
+	}
+	Model(Mesh mesh)
+	{
+		meshes.push_back(mesh);
+		for (int i = 0; i<mesh.textures.size(); i++)
+			textures_loaded.push_back(mesh.textures[i]);
+		directory = "";
 	}
 	void Draw(Shader &shader){
 		for (unsigned int i = 0; i < meshes.size(); i++) {

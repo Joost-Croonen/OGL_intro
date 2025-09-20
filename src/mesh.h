@@ -98,10 +98,10 @@ public:
         float sizey = size.y / 2.0;
         float quadVertices[] = {
         //  verts                       normals             texcoords
-            -sizex, -sizey, 0.0,      0.0, 0.0, 1.0,      -texScale, -texScale,   //0
-             sizex, -sizey, 0.0,      0.0, 0.0, 1.0,       texScale, -texScale,   //1
-             sizex,  sizey, 0.0,      0.0, 0.0, 1.0,       texScale,  texScale,   //2
-            -sizex,  sizey, 0.0,      0.0, 0.0, 1.0,      -texScale,  texScale,   //3
+            -sizex, -sizey, 0.0,      0.0, 0.0, 1.0,        0.0,        0.0,        //0
+             sizex, -sizey, 0.0,      0.0, 0.0, 1.0,        texScale,   0.0,        //1
+             sizex,  sizey, 0.0,      0.0, 0.0, 1.0,        texScale,   texScale,   //2
+            -sizex,  sizey, 0.0,      0.0, 0.0, 1.0,        0.0,        texScale    //3
         };
         for (int i = 0; i < 4; i++) {
             Vertex vertex;
@@ -109,8 +109,8 @@ public:
             vertex.Position = glm::vec3(quadVertices[offset + 0], quadVertices[offset + 1], quadVertices[offset + 2]);
             offset += 3;
             vertex.Normal = glm::vec3(quadVertices[offset + 0], quadVertices[offset + 1], quadVertices[offset + 2]);
-            offset += 2;
-            vertex.TexCoords = glm::vec3(quadVertices[offset + 0], quadVertices[offset + 1], quadVertices[offset + 2]);
+            offset += 3;
+            vertex.TexCoords = glm::vec2(quadVertices[offset + 0], quadVertices[offset + 1]);
             vertices.push_back(vertex);
         }
 
@@ -127,7 +127,7 @@ public:
         TextureData texdata;
         texdata.id = texture.id;
         texdata.type = "texture_diffuse";
-        texdata.path = "";
+        texdata.path = texture.get_path();
         textures.push_back(texdata);
 
         // Setup buffers
@@ -143,37 +143,37 @@ public:
         float sizey = size.y / 2.0;
         float sizez = size.z / 2.0;
         float cubeVertices[] = {
-            // verts                        normals             texcoords
+            // verts                     normals              texcoords
             // Front
-            -sizex, -sizey,  sizez,      0.0,  0.0,  1.0,    -texScale, -texScale,   //0   
-             sizex, -sizey,  sizez,      0.0,  0.0,  1.0,     texScale, -texScale,   //1
+            -sizex, -sizey,  sizez,      0.0,  0.0,  1.0,     0       ,  0       ,   //0   
+             sizex, -sizey,  sizez,      0.0,  0.0,  1.0,     texScale,  0       ,   //1
              sizex,  sizey,  sizez,      0.0,  0.0,  1.0,     texScale,  texScale,   //2
-            -sizex,  sizey,  sizez,      0.0,  0.0,  1.0,    -texScale,  texScale,   //3
+            -sizex,  sizey,  sizez,      0.0,  0.0,  1.0,     0       ,  texScale,   //3
              // Back
-            -sizex, -sizey, -sizez,      0.0,  0.0, -1.0,    -texScale, -texScale,   //4
-             sizex, -sizey, -sizez,      0.0,  0.0, -1.0,     texScale, -texScale,   //5
+            -sizex, -sizey, -sizez,      0.0,  0.0, -1.0,     0       ,  0       ,   //4
+             sizex, -sizey, -sizez,      0.0,  0.0, -1.0,     texScale,  0       ,   //5
              sizex,  sizey, -sizez,      0.0,  0.0, -1.0,     texScale,  texScale,   //6
-            -sizex,  sizey, -sizez,      0.0,  0.0, -1.0,    -texScale,  texScale,   //7
+            -sizex,  sizey, -sizez,      0.0,  0.0, -1.0,     0       ,  texScale,   //7
              // Top
-            -sizex,  sizey,  sizez,      0.0,  1.0,  0.0,    -texScale, -texScale,   //8
-             sizex,  sizey,  sizez,      0.0,  1.0,  0.0,     texScale, -texScale,   //9
+            -sizex,  sizey,  sizez,      0.0,  1.0,  0.0,     0       ,  0       ,   //8
+             sizex,  sizey,  sizez,      0.0,  1.0,  0.0,     texScale,  0       ,   //9
              sizex,  sizey, -sizez,      0.0,  1.0,  0.0,     texScale,  texScale,   //10
-            -sizex,  sizey, -sizez,      0.0,  1.0,  0.0,    -texScale,  texScale,   //11
+            -sizex,  sizey, -sizez,      0.0,  1.0,  0.0,     0       ,  texScale,   //11
              // Bottom                                
-            -sizex, -sizey,  sizez,      0.0, -1.0,  0.0,    -texScale, -texScale,   //12
-             sizex, -sizey,  sizez,      0.0, -1.0,  0.0,     texScale, -texScale,   //13
+            -sizex, -sizey,  sizez,      0.0, -1.0,  0.0,     0       ,  0       ,   //12
+             sizex, -sizey,  sizez,      0.0, -1.0,  0.0,     texScale,  0       ,   //13
              sizex, -sizey, -sizez,      0.0, -1.0,  0.0,     texScale,  texScale,   //14
-            -sizex, -sizey, -sizez,      0.0, -1.0,  0.0,    -texScale,  texScale,   //15
+            -sizex, -sizey, -sizez,      0.0, -1.0,  0.0,     0       ,  texScale,   //15
              // Left                                  
-            -sizex, -sizey,  sizez,     -1.0,  0.0,  0.0,    -texScale, -texScale,   //16
-            -sizex,  sizey,  sizez,     -1.0,  0.0,  0.0,     texScale, -texScale,   //17
+            -sizex, -sizey,  sizez,     -1.0,  0.0,  0.0,     0       ,  0       ,   //16
+            -sizex,  sizey,  sizez,     -1.0,  0.0,  0.0,     texScale,  0       ,   //17
             -sizex,  sizey, -sizez,     -1.0,  0.0,  0.0,     texScale,  texScale,   //18
-            -sizex, -sizey, -sizez,     -1.0,  0.0,  0.0,    -texScale,  texScale,   //19
+            -sizex, -sizey, -sizez,     -1.0,  0.0,  0.0,     0       ,  texScale,   //19
              // Right                                 
-             sizex, -sizey,  sizez,      1.0,  0.0,  0.0,    -texScale, -texScale,   //20
-             sizex,  sizey,  sizez,      1.0,  0.0,  0.0,     texScale, -texScale,   //21
+             sizex, -sizey,  sizez,      1.0,  0.0,  0.0,     0       ,  0       ,   //20
+             sizex,  sizey,  sizez,      1.0,  0.0,  0.0,     texScale,  0       ,   //21
              sizex,  sizey, -sizez,      1.0,  0.0,  0.0,     texScale,  texScale,   //22
-             sizex, -sizey, -sizez,      1.0,  0.0,  0.0,    -texScale,  texScale    //23
+             sizex, -sizey, -sizez,      1.0,  0.0,  0.0,     0       ,  texScale    //23
 
         };
         for (int i = 0; i < 24; i++) {
@@ -182,8 +182,8 @@ public:
             vertex.Position = glm::vec3(cubeVertices[offset + 0], cubeVertices[offset + 1], cubeVertices[offset + 2]);
             offset += 3;
             vertex.Normal = glm::vec3(cubeVertices[offset + 0], cubeVertices[offset + 1], cubeVertices[offset + 2]);
-            offset += 2;
-            vertex.TexCoords = glm::vec3(cubeVertices[offset + 0], cubeVertices[offset + 1], cubeVertices[offset + 2]);
+            offset += 3;
+            vertex.TexCoords = glm::vec2(cubeVertices[offset + 0], cubeVertices[offset + 1]);
             vertices.push_back(vertex);
         }
 
@@ -269,7 +269,6 @@ public:
 
     void Draw() {
         glBindVertexArray(VAOid);
-        glDisable(GL_DEPTH_TEST);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
     }

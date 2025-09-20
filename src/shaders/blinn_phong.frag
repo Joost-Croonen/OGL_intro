@@ -2,7 +2,7 @@
 out vec4 FragColor; 
 in vec3 Normal;
 in vec3 FragPos;
-in vec2 TexCoord;
+in vec2 TexCoords;
 
 struct Material{
     sampler2D texture_diffuse1;
@@ -24,8 +24,8 @@ uniform int num_lights;
 
 vec4 calc_light(int index)
 {
-    vec3 diffuseColor = texture(material.texture_diffuse1, TexCoord).rgb;
-    vec3 specularColor = texture(material.texture_specular1, TexCoord).rgb;
+    vec3 diffuseColor = texture(material.texture_diffuse1, TexCoords).rgb;
+    vec3 specularColor = texture(material.texture_specular1, TexCoords).rgb;
     // attentunation
     float dist = length(light[index].position - FragPos);
     float attenuation = 1.0 / pow(dist, light[index].attenuation_power);
