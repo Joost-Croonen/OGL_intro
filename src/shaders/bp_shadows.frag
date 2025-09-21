@@ -36,11 +36,23 @@ uniform sampler2D shadowMap;
 float calc_shadow(vec4 fragPosLightSpace, vec3 lightDir, vec3 normal)
 {
     vec3 project = (fragPosLightSpace.xyz/fragPosLightSpace.w) * 0.5 + 0.5;
-    float closestDepth = texture(shadowMap, project.xy).r;
     float currentDepth = project.z;
-    float bias = max(0.02 * (1.0 - dot(lightDir, normal)), 0.002);
-    float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
-    shadow = (project.z>1.0) ? 0.0 : shadow;
+    if (currentDepth>1.0)
+        return 0.0;
+    float shadow = 0.0;
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    float closestDepth = texture(shadowMap, project.xy).r;
+    float bias = max(0.015 * (1.0 - dot(lightDir, normal)), 0.0015);
+    float closestShadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
+    float falloff = 0.25;
+    for (int i=0; i<3; i++){
+        for (int j=0; j<3; j++){
+            float pcfDepth = texture(shadowMap, project.xy + vec2(i, j) * texelSize).r;
+            shadow += currentDepth - bias > pcfDepth ? mix(closestShadow, 1.0, min(abs(closestDepth - pcfDepth)/falloff, 1.0)) :mix(closestShadow, 0.0, min(abs(closestDepth - pcfDepth)/falloff, 1.0));
+            //shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+        }
+    }
+    shadow /= 9.0;
     return shadow;
 }
 vec3 calc_point_light(int index)
