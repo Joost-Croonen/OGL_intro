@@ -217,12 +217,52 @@ public:
         glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
     }
 
+    Cubemap(unsigned int width, unsigned int height, GLenum internalFormat, unsigned int samples = 1,
+        GLint min_filt = GL_NEAREST, GLint mag_filt = GL_NEAREST,
+        GLint wrap_r = GL_CLAMP_TO_EDGE, GLint wrap_s = GL_CLAMP_TO_EDGE, GLint wrap_t = GL_CLAMP_TO_EDGE,
+        float borderColor[4] = DEFAULT_BORDER_COLOR) :
+        paths(std::vector<std::string>{}), width(width), height(height), nrChannels(1)
+    {
+        GLenum dataFormat;
+        GLenum pixelType;
+        if (internalFormat == GL_DEPTH_COMPONENT)
+        {
+            dataFormat = GL_DEPTH_COMPONENT;
+            nrChannels = 1;
+            pixelType = GL_FLOAT;
+        }
+        else {
+            dataFormat = GL_RGB;
+            nrChannels = 3;
+            pixelType = GL_UNSIGNED_BYTE;
+        }
+        glGenTextures(1, &id);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, id);
+        for (unsigned int i=0; i<6; ++i)
+        {
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, internalFormat, this->width, this->height, 0, dataFormat, pixelType, NULL);
+        }
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, min_filt);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, mag_filt);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, wrap_r);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, wrap_s);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, wrap_t);
+        glTexParameterfv(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+        glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+    }
+
     void activate(Shader shader, const char* name, unsigned int texture_unit) const
     {
         shader.use();
-        shader.setInt(name, texture_unit);
         glActiveTexture(GL_TEXTURE0 + texture_unit);
+        shader.setInt(name, texture_unit);
         glBindTexture(GL_TEXTURE_CUBE_MAP, id);
+    }
+
+    void attach(GLenum attachement) const
+    {
+        glFramebufferTexture(GL_FRAMEBUFFER, attachement, id, 0);
     }
 
 private:

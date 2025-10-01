@@ -4,6 +4,7 @@ out vec4 FragColor;
 in vec2 TexCoords;
 
 uniform sampler2D depthMap;
+uniform bool perspective;
 
 //void main()
 //{             
@@ -14,11 +15,12 @@ uniform sampler2D depthMap;
 
 void main()
 {    
-    float depth = gl_FragCoord.z;
+    //float depth = gl_FragCoord.z;
+    float depth = texture(depthMap, TexCoords).r;
     float ndc = 2.0 * depth - 1.0;
     float near = 1.0;
     float far = 7.5;
     float linDepth = (2.0 * near * far)/(far + near - ndc * (far - near));
-    //FragColor = vec4(vec3(linDepth/far), 1.0);    //perspective
-    FragColor = vec4(vec3(texture(depthMap, TexCoords).r), 1.0);      //orhtographic
+    if (perspective) FragColor = vec4(vec3(linDepth/far), 1.0);    //perspective
+    else FragColor = vec4(vec3(texture(depthMap, TexCoords).r), 1.0);      //orhtographic
 }
