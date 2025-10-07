@@ -6,6 +6,8 @@ struct Vertex {
     glm::vec3 Position;
     glm::vec3 Normal;
     glm::vec2 TexCoords;
+    glm::vec3 Tangent;
+    glm::vec3 Bitangent;
 };
 
 struct TextureData {
@@ -35,6 +37,7 @@ public:
     void Draw(Shader& shader) {
         unsigned int diffuseNr = 1;
         unsigned int specularNr = 1;
+        unsigned int normalNr = 1;
 
         for (int i = 0; i < textures.size(); i++) {
             glActiveTexture(GL_TEXTURE0 + i);
@@ -44,6 +47,8 @@ public:
                 number = std::to_string(diffuseNr++);
             if (name == "texture_specular")
                 number = std::to_string(specularNr++);
+            if (name == "texture_normal")
+                number = std::to_string(normalNr++);
             shader.setInt(("material." + name + number).c_str(), i);
             glBindTexture(GL_TEXTURE_2D, textures[i].id);
         }
@@ -83,6 +88,12 @@ protected:
         // texcoords
         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, TexCoords));
         glEnableVertexAttribArray(2);
+        // tangent
+        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Tangent));
+        glEnableVertexAttribArray(3);
+        // bitangent
+        glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Bitangent));
+        glEnableVertexAttribArray(4);
         
         // unbind
         glBindVertexArray(0);
@@ -92,43 +103,95 @@ protected:
 class Quad : public Mesh
 {
 public:
-    Quad(glm::vec2 size, float texScale, Texture texture) {
+    Quad(glm::vec2 size, float texScale, std::vector<TextureData> textureDataList) {
         // Setup vertices
         float sizex = size.x / 2.0;
         float sizey = size.y / 2.0;
         float quadVertices[] = {
-        //  verts                       normals             texcoords
-            -sizex, -sizey, 0.0,      0.0, 0.0, 1.0,        0.0,        0.0,        //0
-             sizex, -sizey, 0.0,      0.0, 0.0, 1.0,        texScale,   0.0,        //1
-             sizex,  sizey, 0.0,      0.0, 0.0, 1.0,        texScale,   texScale,   //2
-            -sizex,  sizey, 0.0,      0.0, 0.0, 1.0,        0.0,        texScale    //3
+        //  verts                   normals           texcoords               tangent         bitangent
+            -sizex, -sizey, 0.0,    0.0, 0.0, 1.0,    0.0,        0.0,        1.0, 0.0, 0.0,  0.0, 1.0, 0.0,  //0
+             sizex, -sizey, 0.0,    0.0, 0.0, 1.0,    texScale,   0.0,        1.0, 0.0, 0.0,  0.0, 1.0, 0.0,  //1
+             sizex,  sizey, 0.0,    0.0, 0.0, 1.0,    texScale,   texScale,   1.0, 0.0, 0.0,  0.0, 1.0, 0.0,  //2
+            -sizex,  sizey, 0.0,    0.0, 0.0, 1.0,    0.0,        texScale,   1.0, 0.0, 0.0,  0.0, 1.0, 0.0,  //3
         };
+
         for (int i = 0; i < 4; i++) {
             Vertex vertex;
-            int offset = i * 8;
+            int offset = i * 14;
             vertex.Position = glm::vec3(quadVertices[offset + 0], quadVertices[offset + 1], quadVertices[offset + 2]);
             offset += 3;
             vertex.Normal = glm::vec3(quadVertices[offset + 0], quadVertices[offset + 1], quadVertices[offset + 2]);
             offset += 3;
-            vertex.TexCoords = glm::vec2(quadVertices[offset + 0], quadVertices[offset + 1]);
+            vertex.TexCoords = glm::vec2(quadVertices[offset + 0], quadVertices[offset + 1]); 
+            offset += 2;
+            vertex.Tangent = glm::vec3(quadVertices[offset + 0], quadVertices[offset + 1], quadVertices[offset + 2]);
+            offset += 3;
+            vertex.Bitangent = glm::vec3(quadVertices[offset + 0], quadVertices[offset + 1], quadVertices[offset + 2]);
             vertices.push_back(vertex);
         }
 
+        /*
+        glm::vec3 edge1 = vertices[1].Position - vertices[0].Position;
+        glm::vec3 edge2 = vertices[2].Position - vertices[0].Position;
+        glm::vec2 deltaUV1 = vertices[1].TexCoords - vertices[0].TexCoords;
+        glm::vec2 deltaUV2 = vertices[2].TexCoords - vertices[0].TexCoords;
+
+        float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        float x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        float y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        float z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+
+        std::cout << x << std::endl;
+        std::cout << y << std::endl;
+        std::cout << z << std::endl;
+
+        x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
+        y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
+        z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+
+        std::cout << x << std::endl;
+        std::cout << y << std::endl;
+        std::cout << z << std::endl;
+
+        edge1 = vertices[2].Position - vertices[0].Position;
+        edge2 = vertices[3].Position - vertices[0].Position;
+        deltaUV1 = vertices[2].TexCoords - vertices[0].TexCoords;
+        deltaUV2 = vertices[3].TexCoords - vertices[0].TexCoords;
+
+        f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+
+        std::cout << x << std::endl;
+        std::cout << y << std::endl;
+        std::cout << z << std::endl;
+
+        x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
+        y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
+        z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+
+        std::cout << x << std::endl;
+        std::cout << y << std::endl;
+        std::cout << z << std::endl;
+
+        */
+
         // Setup indices
         unsigned int quadIndices[] = {
-            0, 1, 2,
-            0, 2, 3
+            //0, 1, 2,
+            //0, 2, 3
+            3, 0, 1,
+            3, 1, 2
         };
         for (int i = 0; i < 6; i++) {
             indices.push_back(quadIndices[i]);
         }
 
         // Setup textures
-        TextureData texdata;
-        texdata.id = texture.id;
-        texdata.type = "texture_diffuse";
-        texdata.path = texture.get_path();
-        textures.push_back(texdata);
+        textures = textureDataList;
 
         // Setup buffers
         setup_mesh();

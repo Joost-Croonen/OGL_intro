@@ -37,7 +37,7 @@ private:
 	void loadModel(std::string path){
 		// assimp load scene
 		Assimp::Importer importer;
-		const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs);
+		const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
 		// error handling
 		if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
 		{
@@ -89,7 +89,17 @@ private:
 			}
 			else
 				vertex.TexCoords = glm::vec2(0.0f, 0.0f);
-
+			if (mesh->HasTangentsAndBitangents()) //TODO: check if this is correct
+			{
+				vector.x = mesh->mTangents[i].x;
+				vector.y = mesh->mTangents[i].y;
+				vector.y = mesh->mTangents[i].y;
+				vertex.Tangent = vector;
+				vector.x = mesh->mBitangents[i].x;
+				vector.y = mesh->mBitangents[i].y;
+				vector.y = mesh->mBitangents[i].y;
+				vertex.Bitangent = vector;
+			}
 			vertices.push_back(vertex);
 		}
 		// process indices

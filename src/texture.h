@@ -66,13 +66,13 @@ public:
 
     //Texture() {};
 
-    Texture(const char* path, bool gamma_correct = false, 
+    Texture(const char* path, bool gamma_correct = false, bool flipY = true,
         GLint wrap_s = GL_REPEAT, GLint wrap_t = GL_REPEAT,
         GLint min_filt = GL_LINEAR_MIPMAP_LINEAR, GLint mag_filt = GL_LINEAR) :
         albedoPath(path), samples(1)
 	{
         // Set image orientation
-        stbi_set_flip_vertically_on_load(true);
+        stbi_set_flip_vertically_on_load(flipY);
         // Generate and bind
         glGenTextures(1, &id);
         glBindTexture(GL_TEXTURE_2D, id);
