@@ -27,8 +27,8 @@ void main()
     vec3 T = normalize(vec3(model * vec4(aTangent,   0.0)));
     vec3 B = normalize(vec3(model * vec4(aBitangent, 0.0)));
     vec3 N = normalize(vec3(model * vec4(aNormal,    0.0)));
-    //T = normalize(T - dot(T, N) * N);   // Gramm-Schmidt renormalize
-    //B = cross(N, T);                    // Cross product to find new Bitangent
+    T = normalize(T - dot(T, N) * N);   // Gramm-Schmidt renormalize
+    B = cross(N, T);                    // Cross product to find new Bitangent
     TBN = mat3(T, B, N);
     invTBN = transpose(TBN);
     tangentViewPos = invTBN * viewPos;

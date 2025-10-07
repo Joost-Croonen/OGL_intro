@@ -40,6 +40,7 @@ bool post_process = false;
 bool post_process_key = false;
 bool normal_mapping = false;
 bool normal_mapping_key = false;
+float heightScale = 0.0f;
 
 // camera
 Camera camera(glm::vec3(1.0f, 1.5f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -100, -20);
@@ -2951,9 +2952,188 @@ int normal_map_scene() {
     return 0;
 }
 
+int parallax_map_scene() {
+    // Variable setup
+    const unsigned int MS_SAMPLES = 1;
+    float gamma = 2.2;
+    bool manual_gamma = false;
+    bool gamma_correct = (gamma != 1.0);
+
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, MS_SAMPLES);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+
+    // OGL state setup --------------------------------------------------
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    //glEnable(GL_BLEND);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    if (MS_SAMPLES > 1) glEnable(GL_MULTISAMPLE);
+
+    if (gamma_correct && !manual_gamma) glEnable(GL_FRAMEBUFFER_SRGB);
+
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+
+    // Setup geometry, textures, buffers and shaders --------------------
+    // Vertices
+
+    // Shaders
+    Shader ourShader("../../../src/shaders/normal_mapping.vert", "../../../src/shaders/parallax.frag");
+    Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
+    Shader tbnShader("../../../src/shaders/tbn_visualiser.vert", "../../../src/shaders/tbn_visualiser.geom", "../../../src/shaders/tbn_visualiser.frag");
+
+    // Load textures
+    Texture brick_albedo = Texture("../../../src/textures/brick_diffuse.png", gamma_correct, true);
+    Texture brick_normal = Texture("../../../src/textures/brick_normal.png", false, true);
+    Texture brick_height = Texture("../../../src/textures/brick_displacement.png", false, true);
+    /*
+    Texture brick_albedo = Texture("../../../src/textures/bricks2.jpg", gamma_correct, false);
+    Texture brick_normal = Texture("../../../src/textures/bricks2_normal.jpg", false, false);
+    Texture brick_height = Texture("../../../src/textures/bricks2_disp.jpg", false, false);
+    */
+
+    TextureData brickAlbedoData = { brick_albedo.id, "texture_diffuse", brick_albedo.get_path() };
+    TextureData brickNormalData = { brick_normal.id, "texture_normal", brick_normal.get_path() };
+    TextureData brickHeightData = { brick_height.id, "texture_height", brick_height.get_path() };
+
+    // Models & meshes
+    Model quad = Model(Quad(glm::vec2(4.0), 1.0, std::vector<TextureData>{brickAlbedoData, brickNormalData, brickHeightData}));
+
+    // Lights
+    glm::vec3 lightPositions[] = {
+        glm::vec3(0.25f, 0.5f, 0.25f)
+    };
+    glm::vec3 lightColors[] = {
+        glm::vec3(1.0f)
+    };
+
+    // Offscreen rendering setup
+    // Post processing
+    PPO ppo = PPO(screenShader, SCR_WIDTH, SCR_HEIGHT, MS_SAMPLES);
+
+    // shader setup
+    ourShader.use();
+    int num_lights = sizeof(lightPositions) / sizeof(lightPositions[0]);
+    ourShader.setInt("num_lights", num_lights);
+    for (int i = 0; i < num_lights; i++) {
+        ourShader.setVec3("light[" + std::to_string(i) + "].position", lightPositions[i]);
+        ourShader.setVec3("light[" + std::to_string(i) + "].color", lightColors[i]);
+        ourShader.setFloat("light[" + std::to_string(i) + "].attenuation_power", gamma_correct ? 2.0 : 1.0);
+    }
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    ourShader.setMat4("projection", projection);
+    ourShader.setFloat("material.shininess", 64.0);
+    ourShader.setVec3("lightPos", lightPositions[0]);
+
+    screenShader.use();
+    screenShader.setFloat("gamma", gamma);
+
+    // Background
+    glm::vec3 clear_color = glm::vec3(pow(0.1, gamma));
+
+    auto renderScene = [&](Shader shader) {
+        shader.use();
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0, 0.0, -0.5));
+        //model = glm::rotate(model, glm::radians(-60.0f), glm::vec3(1.0, 0.0, 0.0));
+        shader.setMat4("model", model);
+        quad.Draw(shader);
+        };
+
+    // Main render loop ---------------------------------------------------
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+
+        // Main render pass
+        if (post_process) ppo.start_render_to_texture();
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClearColor(clear_color.r, clear_color.g, clear_color.b, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
+
+        glm::mat4 view = camera.GetViewMatrix();
+
+        ourShader.use();
+        ourShader.setVec3("viewPos", camera.Position);
+        ourShader.setMat4("view", view);
+        ourShader.setBool("normal_mapping", normal_mapping);
+        ourShader.setFloat("height_scale", heightScale);
+        renderScene(ourShader);
+
+        if (post_process) ppo.draw_texture_to_screen();
+
+        //depthShader.use();
+        //shadowCubeMap.activate(ourShader, "shadowCubeMap", 1);
+        //screen.Draw();
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Terminate
+    quad.Delete();
+    ppo.Delete();
+    glfwTerminate();
+    return 0;
+}
+
+
 int main(void)
 {
-    switch (13)
+    switch (14)
     {
     case 0:  return base_scene(); break;
     case 1:  return main_scene(); break;
@@ -2969,6 +3149,7 @@ int main(void)
     case 11: return shadow_scene(); break;
     case 12: return point_shadow_scene(); break;
     case 13: return normal_map_scene(); break;
+    case 14: return parallax_map_scene(); break;
     }
 }
 
@@ -3008,6 +3189,26 @@ void processInput(GLFWwindow* window)
     }
     if (glfwGetKey(window, GLFW_KEY_N) == GLFW_RELEASE) {
         normal_mapping_key = false;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+    {
+        if (heightScale > 0.0f) {
+            heightScale -= 0.0005f;
+            std::cout << heightScale << std::endl;
+        }
+      
+        else
+            heightScale = 0.0f;
+    }
+    else if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+    {
+        if (heightScale < 1.0f) {
+            heightScale += 0.0005f;
+            std::cout << heightScale << std::endl;
+        }
+        else
+            heightScale = 1.0f;
     }
 }
 
