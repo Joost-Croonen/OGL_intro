@@ -3027,6 +3027,7 @@ int parallax_map_scene() {
     Shader tbnShader("../../../src/shaders/tbn_visualiser.vert", "../../../src/shaders/tbn_visualiser.geom", "../../../src/shaders/tbn_visualiser.frag");
 
     // Load textures
+    
     Texture brick_albedo = Texture("../../../src/textures/brick_diffuse.png", gamma_correct, true);
     Texture brick_normal = Texture("../../../src/textures/brick_normal.png", false, true);
     Texture brick_height = Texture("../../../src/textures/brick_displacement.png", false, true);
@@ -3045,7 +3046,7 @@ int parallax_map_scene() {
 
     // Lights
     glm::vec3 lightPositions[] = {
-        glm::vec3(0.25f, 0.5f, 0.25f)
+        glm::vec3(0.35f, 0.5f, -0.25f)
     };
     glm::vec3 lightColors[] = {
         glm::vec3(1.0f)
