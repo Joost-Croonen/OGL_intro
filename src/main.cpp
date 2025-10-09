@@ -3034,9 +3034,12 @@ int parallax_map_scene() {
     /*
     Texture brick_albedo = Texture("../../../src/textures/bricks2.jpg", gamma_correct, false);
     Texture brick_normal = Texture("../../../src/textures/bricks2_normal.jpg", false, false);
-    Texture brick_height = Texture("../../../src/textures/bricks2_disp.jpg", false, false);
+    Texture brick_height = Texture("../../../src/textures/bricks2_disp.jpg", false, false, true);
+    
+    Texture brick_albedo = Texture("../../../src/textures/toy_box_diffuse.png", gamma_correct, false);
+    Texture brick_normal = Texture("../../../src/textures/toy_box_normal.png", false, false);
+    Texture brick_height = Texture("../../../src/textures/toy_box_disp.png", false, false, true);
     */
-
     TextureData brickAlbedoData = { brick_albedo.id, "texture_diffuse", brick_albedo.get_path() };
     TextureData brickNormalData = { brick_normal.id, "texture_normal", brick_normal.get_path() };
     TextureData brickHeightData = { brick_height.id, "texture_height", brick_height.get_path() };
@@ -3046,7 +3049,7 @@ int parallax_map_scene() {
 
     // Lights
     glm::vec3 lightPositions[] = {
-        glm::vec3(0.35f, 0.5f, -0.25f)
+        glm::vec3(0.0f, 0.0f, 0.0f)
     };
     glm::vec3 lightColors[] = {
         glm::vec3(1.0f)

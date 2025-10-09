@@ -129,7 +129,10 @@ vec2 refined_parallax(vec3 viewDir, vec2 startCoords)
 
 vec2 binary_parallax(vec3 viewDir, vec2 startCoords)
 {
-    const int numLayers = 12;
+    const float minLayers = 2;
+    const float maxLayers = 32;
+    float numLayers = mix(maxLayers, minLayers, abs(dot(vec3(0.0, 0.0, 1.0), viewDir)));
+    //numLayers = 28;
     float layerDepth = 1.0 / numLayers;
     float currentLayerDepth = 0.0;
     
@@ -180,6 +183,57 @@ vec2 binary_parallax(vec3 viewDir, vec2 startCoords)
     return parallaxCoords;
 }
 
+float myShadowCalc(vec3 lightDir, vec2 startCoords)
+{
+    const int numLayers = 12;
+    const float layerDepth = 1.0f / numLayers;
+    
+    vec2 P = lightDir.xy * height_scale;
+    vec2 deltaUV = P / numLayers;
+
+    vec2 currentUV = startCoords;
+    float currentMapDepth = 1.0 - texture(material.texture_height1, currentUV).r;
+    float currentLayerDepth = currentMapDepth;
+    while (currentLayerDepth <= currentMapDepth && currentLayerDepth > 0.0)
+    {
+        currentUV += deltaUV;
+        currentMapDepth = 1.0 - texture(material.texture_height1, currentUV).r;
+        currentLayerDepth -= layerDepth;
+    }
+    
+    float r = currentLayerDepth > currentMapDepth ? 1.0 : 0.0;
+    return r;
+}
+
+float ShadowCalc(vec3 lightDir, vec2 startCoord)
+{
+    if ( lightDir.z >= 0.0 )
+        return 0.0;
+
+    float minLayers = 0;
+    float maxLayers = 32;
+    float numLayers = mix(maxLayers, minLayers, abs(dot(vec3(0.0, 0.0, 1.0), lightDir)));
+    numLayers = 16;
+
+    vec2 currentTexCoords = startCoord;
+    float currentDepthMapValue = 1.0 - texture(material.texture_height1, currentTexCoords).r;
+    float currentLayerDepth = currentDepthMapValue;
+
+    float layerDepth = 1.0 / numLayers;
+    vec2 P = lightDir.xy * height_scale;
+    vec2 deltaTexCoords = P / numLayers;
+
+    while (currentLayerDepth <= currentDepthMapValue && currentLayerDepth > 0.0)
+    {
+        currentTexCoords += deltaTexCoords;
+        currentDepthMapValue = 1.0 - texture(material.texture_height1, currentTexCoords).r;
+        currentLayerDepth -= layerDepth;
+    }
+
+    float r = currentLayerDepth > currentDepthMapValue ? 0.0 : 1.0;
+    return r;
+}
+
 vec4 calc_light(int index)
 {
     vec3 viewDir = normalize(tangentViewPos - tangentFragPos);
@@ -202,14 +256,15 @@ vec4 calc_light(int index)
     vec3 specular = pow(max(dot(norm, halfVec), 0.0), material.shininess) * diffuseColor;
     // self shadow
     float texDepth = 1.0 - texture(material.texture_height1, parallaxCoords).r;
-    vec2 lightIntersect = TexCoords - viewDir.xy * height_scale * texDepth + lightDir.xy * height_scale * texDepth;
+    vec2 lightIntersect = parallaxCoords + lightDir.xy * height_scale * texDepth;
     vec2 shadowCoords = binary_parallax(lightDir, lightIntersect);
     float shadowDepth = 1.0 - texture(material.texture_height1, shadowCoords).r;
-    bool occluded = shadowDepth < texDepth - 0.01;
-    float selfShadow = occluded ? 1.0 : 0.0;
-    selfShadow = mix(0.0, 1.0, clamp(4 * texDepth - 4 * shadowDepth, 0.0, 1.0));
+    //bool occluded = shadowDepth <= texDepth ;
+    float bias = 0.01;
+    float selfShadow = shadowDepth >= texDepth-bias ? 0.0 : 1.0;
+    selfShadow = mix(0.0, 1.0, clamp(6 * texDepth - 6 * shadowDepth, 0.0, 1.0));
     //selfShadow = mix(0.0, 1.0, clamp(length(400 * parallaxCoords - 400 * shadowCoords), 0.0, 1.0));
-    
+    //selfShadow = myShadowCalc(lightDir, parallaxCoords);
     return vec4((1.0 - selfShadow) * attenuation * (diffuse + specular) * light[index].color, 1.0);
 }
 

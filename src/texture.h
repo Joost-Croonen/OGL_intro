@@ -66,7 +66,8 @@ public:
 
     //Texture() {};
 
-    Texture(const char* path, bool gamma_correct = false, bool flipY = true,
+    Texture(const char* path, 
+        bool gamma_correct = false, bool flipY = true, bool inverted = false,
         GLint wrap_s = GL_REPEAT, GLint wrap_t = GL_REPEAT,
         GLint min_filt = GL_LINEAR_MIPMAP_LINEAR, GLint mag_filt = GL_LINEAR) :
         albedoPath(path), samples(1)
@@ -83,6 +84,10 @@ public:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filt);
         // Load image
         unsigned char* data = stbi_load(albedoPath, &width, &height, &nrChannels, 0);
+        if (inverted) {
+            for (int i = 0; i < width * height * nrChannels; ++i)
+                data[i] = 255 - data[i];
+        }
         // Create texture and generate mipmaps for currently bound texture
         if (data) {
             GLenum format;
