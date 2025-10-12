@@ -37,8 +37,8 @@ public:
         fbo(FBO()),
         msfbo(FBO()),
         rbo(RBO(width, height, GL_DEPTH24_STENCIL8, num_samples)),
-        msTexture(      Texture(width, height, GL_RGB16, num_samples)),
-        screenTexture(  Texture(width, height, GL_RGB16, 1))
+        msTexture(      Texture(width, height, GL_RGB16F, num_samples)),
+        screenTexture(  Texture(width, height, GL_RGB16F, 1))
     {
         vao.bind();
         vao.linkVBO(vbo);

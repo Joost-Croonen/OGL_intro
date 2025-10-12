@@ -41,9 +41,11 @@ bool post_process_key = false;
 bool normal_mapping = false;
 bool normal_mapping_key = false;
 float heightScale = 0.0f;
+float exposure = 1.0f;
 
 // camera
-Camera camera(glm::vec3(1.0f, 1.5f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -100, -20);
+//Camera camera(glm::vec3(1.0f, 1.5f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -100, -20);
+Camera camera(glm::vec3(0.0f, 0.0f, 5.0f), glm::vec3(0.0f, 1.0f, 0.0f), -100, -20);
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -2056,7 +2058,7 @@ int gamma_scene() {
     // post process
     FBO postProcessFrameBuffer = FBO();
     postProcessFrameBuffer.bind();
-    Texture screenBufferTexture = Texture(SCR_WIDTH, SCR_HEIGHT, GL_RGB16);
+    Texture screenBufferTexture = Texture(SCR_WIDTH, SCR_HEIGHT, GL_RGB16F);
     screenBufferTexture.attach(GL_COLOR_ATTACHMENT0);
     postProcessFrameBuffer.check_status();
     postProcessFrameBuffer.unbind();
@@ -2255,7 +2257,7 @@ int quad_cube_test_scene() {
 
     // Models & meshes
     Quad quad = Quad(glm::vec2(5.0), 1.0, std::vector<TextureData>{woodData});
-    Cube cube = Cube(glm::vec3(1.0), 1.0, wood);
+    Cube cube = Cube(glm::vec3(1.0), 1.0, std::vector<TextureData>{woodData});
 
     // Offscreen rendering setup
     PPO ppo = PPO(screenShader, SCR_WIDTH, SCR_HEIGHT, MS_SAMPLES);
@@ -2387,7 +2389,7 @@ int shadow_scene() {
 
     // Models & meshes
     Model quad = Model(Quad(glm::vec2(50.0), 25.0, std::vector<TextureData>{woodData}));
-    Model cube = Model(Cube(glm::vec3(2.0), 1.0, wood));
+    Model cube = Model(Cube(glm::vec3(2.0), 1.0, std::vector<TextureData>{woodData}));
     ScreenQuad screen = ScreenQuad();
 
     glm::vec3 cubePositions[] = {
@@ -2613,7 +2615,7 @@ int point_shadow_scene() {
     
     // Models & meshes
     Model quad = Model(Quad(glm::vec2(50.0), 25.0, std::vector<TextureData>{woodData}));
-    Model cube = Model(Cube(glm::vec3(2.0), 1.0, wood));
+    Model cube = Model(Cube(glm::vec3(2.0), 1.0, std::vector<TextureData>{woodData}));
     ScreenQuad screen = ScreenQuad();
 
     glm::vec3 cubePositions[] = {
@@ -3046,13 +3048,14 @@ int parallax_map_scene() {
 
     // Models & meshes
     Model quad = Model(Quad(glm::vec2(4.0), 1.0, std::vector<TextureData>{brickAlbedoData, brickNormalData, brickHeightData}));
+    Model cube = Model(Cube(glm::vec3(1.0), 0.25, std::vector<TextureData>{brickAlbedoData, brickNormalData, brickHeightData}));
 
     // Lights
     glm::vec3 lightPositions[] = {
-        glm::vec3(0.0f, 0.0f, 0.0f)
+        glm::vec3(0.0f, 0.0f, 0.0f),
     };
     glm::vec3 lightColors[] = {
-        glm::vec3(1.0f)
+        glm::vec3(2.0f)
     };
 
     // Offscreen rendering setup
@@ -3082,10 +3085,14 @@ int parallax_map_scene() {
     auto renderScene = [&](Shader shader) {
         shader.use();
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0, 0.0, -0.5));
+        model = glm::translate(model, glm::vec3(0.0, 0.0, -1.75));
         //model = glm::rotate(model, glm::radians(-60.0f), glm::vec3(1.0, 0.0, 0.0));
         shader.setMat4("model", model);
         quad.Draw(shader);
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(1.0, -1.0, -1.0));
+        shader.setMat4("model", model);
+        cube.Draw(shader);
         };
 
     // Main render loop ---------------------------------------------------
@@ -3134,6 +3141,180 @@ int parallax_map_scene() {
     return 0;
 }
 
+int hdr_scene() {
+    // Variable setup
+    const unsigned int MS_SAMPLES = 1;
+    float gamma = 2.2;
+    bool manual_gamma = true;
+    bool gamma_correct = (gamma != 1.0);
+
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, MS_SAMPLES);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+
+    // OGL state setup --------------------------------------------------
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    //glEnable(GL_BLEND);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    if (MS_SAMPLES > 1) glEnable(GL_MULTISAMPLE);
+
+    if (gamma_correct && !manual_gamma) glEnable(GL_FRAMEBUFFER_SRGB);
+
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+
+    // Setup geometry, textures, buffers and shaders --------------------
+    // Vertices
+
+    // Shaders
+    Shader ourShader("../../../src/shaders/blinn_phong.vert", "../../../src/shaders/blinn_phong.frag");
+    Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
+
+    // Load textures
+    Texture wood = Texture("../../../src/textures/wood.png", gamma_correct);
+    TextureData woodData = { wood.id, "texture_diffuse", wood.get_path() };
+
+    // Models & meshes
+    Model cube = Model(Cube(glm::vec3(2.0), 1.0, std::vector<TextureData>{woodData}));
+
+    // Lights
+    glm::vec3 lightPositions[] = {
+        glm::vec3(0.0f,  0.0f, 49.5f),
+        glm::vec3(-1.4f, -1.9f, 9.0f),
+        glm::vec3(0.0f, -1.8f, 4.0f),
+        glm::vec3(0.8f, -1.7f, 6.0f)
+    };
+    glm::vec3 lightColors[] = {
+        glm::vec3(200.0f, 200.0f, 200.0f), 
+        glm::vec3(0.1f, 0.0f, 0.0f),
+        glm::vec3(0.0f, 0.0f, 0.2f), 
+        glm::vec3(0.0f, 0.1f, 0.0f)
+    };
+
+    // Offscreen rendering setup
+    // Post processing
+    PPO ppo = PPO(screenShader, SCR_WIDTH, SCR_HEIGHT, MS_SAMPLES);
+
+    // shader setup
+    ourShader.use();
+    int num_lights = sizeof(lightPositions) / sizeof(lightPositions[0]);
+    ourShader.setInt("num_lights", num_lights);
+    for (int i = 0; i < num_lights; i++) {
+        ourShader.setVec3("light[" + std::to_string(i) + "].position", lightPositions[i]);
+        ourShader.setVec3("light[" + std::to_string(i) + "].color", lightColors[i]);
+        ourShader.setFloat("light[" + std::to_string(i) + "].attenuation_power", gamma_correct ? 2.0 : 1.0);
+    }
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    ourShader.setFloat("material.shininess", 64.0);
+
+    
+
+    // Background
+    glm::vec3 clear_color = glm::vec3(pow(0.1, gamma));
+
+    auto renderScene = [&](Shader shader) {
+        shader.use();
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 25.0));
+        model = glm::scale(model, glm::vec3(2.5f, 2.5f, 27.5f));
+        shader.setMat4("model", model);
+        shader.setBool("reverse_normals", true);
+        glFrontFace(GL_CW);
+        cube.Draw(shader);
+        glFrontFace(GL_CCW);
+        };
+
+    // Main render loop ---------------------------------------------------
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+
+        // Main render pass
+        if (post_process) ppo.start_render_to_texture();
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClearColor(clear_color.r, clear_color.g, clear_color.b, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
+
+        glm::mat4 view = camera.GetViewMatrix();
+
+        ourShader.use();
+        ourShader.setVec3("viewPos", camera.Position);
+        ourShader.setMat4("view", view);
+        ourShader.setMat4("projection", projection);
+        renderScene(ourShader);
+
+        screenShader.use();
+        screenShader.setFloat("gamma", gamma);
+        screenShader.setFloat("exposure", exposure);
+        if (post_process) ppo.draw_texture_to_screen();
+
+        //depthShader.use();
+        //shadowCubeMap.activate(ourShader, "shadowCubeMap", 1);
+        //screen.Draw();
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Terminate
+    cube.Delete();
+    ppo.Delete();
+    glfwTerminate();
+    return 0;
+}
 
 int main(void)
 {
@@ -3154,6 +3335,7 @@ int main(void)
     case 12: return point_shadow_scene(); break;
     case 13: return normal_map_scene(); break;
     case 14: return parallax_map_scene(); break;
+    case 15: return hdr_scene(); break;
     }
 }
 
@@ -3213,6 +3395,25 @@ void processInput(GLFWwindow* window)
         }
         else
             heightScale = 1.0f;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+    {
+        if (exposure > 0.01f) {
+            exposure -= 0.005f;
+            std::cout << exposure << std::endl;
+        }
+        else
+            exposure = 0.01f;
+    }
+    else if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+    {
+        if (exposure < 100.0f) {
+            exposure += 0.005f;
+            std::cout << exposure << std::endl;
+        }
+        else
+            exposure = 100.0f;
     }
 }
 

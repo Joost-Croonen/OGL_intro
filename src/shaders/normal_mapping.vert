@@ -5,16 +5,19 @@ layout (location = 2) in vec2 aTexCoord; // texture coordinates have attribute p
 layout (location = 3) in vec3 aTangent;
 layout (location = 4) in vec3 aBitangent;  
 
+#define MAX_LIGHTS 10
 out vec3 FragPos;
 out mat3 TBN;
 out mat3 invTBN;
 out vec3 Normal;
 out vec2 TexCoords;
 out vec3 tangentViewPos;
-out vec3 tangentLightPos;
+out vec3 tangentLightPos[MAX_LIGHTS];
 out vec3 tangentFragPos;
 
-uniform vec3 lightPos;
+
+uniform int num_lights;
+uniform vec3 lightPos[MAX_LIGHTS];
 uniform vec3 viewPos;
 
 uniform mat4 model;
@@ -32,7 +35,9 @@ void main()
     TBN = mat3(T, B, N);
     invTBN = transpose(TBN);
     tangentViewPos = invTBN * viewPos;
-    tangentLightPos = invTBN * lightPos;
+    for(int i = 0; i < min(num_lights, MAX_LIGHTS); ++i)
+        tangentLightPos[i] = invTBN * lightPos[i];
+    //tangentLightPos = invTBN * lightPos;
     tangentFragPos = invTBN * FragPos;
     Normal = mat3(transpose(inverse(model))) * aNormal;
     TexCoords = aTexCoord;

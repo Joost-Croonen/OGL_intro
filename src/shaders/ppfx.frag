@@ -6,6 +6,7 @@ in vec2 TexCoords;
 uniform sampler2D screenTexture;
 
 uniform float gamma;
+uniform float exposure;
 
 const float offset = 1.0/360.0;
     
@@ -28,23 +29,35 @@ void sreenSampler(inout vec3 sreenSamples[9])
     }
 }
 
-vec4 invertColor()
+vec4 invertColor(vec4 input_color)
 {
-    vec4 screenColor = texture(screenTexture, TexCoords);
-    return vec4(vec3(1.0-screenColor), 1.0);
+    //vec4 screenColor = texture(screenTexture, TexCoords);
+    return vec4(vec3(1.0-input_color), 1.0);
 }
 
-vec4 grayScaleColor()
+vec4 grayScaleColor(vec4 input_color)
 {
-    vec4 screenColor = texture(screenTexture, TexCoords);
-    float average = ( 0.2126 * screenColor.r + 0.7152 * screenColor.g + 0.0722 * screenColor.b)/3.0;
+    //vec4 screenColor = texture(screenTexture, TexCoords);
+    float average = ( 0.2126 * input_color.r + 0.7152 * input_color.g + 0.0722 * input_color.b)/3.0;
     return vec4(average, average, average, 1.0);
 }
 
-vec4 gammaColor()
+vec4 reinhardToneMappingColor(vec4 input_color)
 {
-    vec4 screenColor = texture(screenTexture, TexCoords);
-    return vec4(pow(screenColor.rgb, vec3(1.0/gamma)), 1.0);
+    vec3 mapped = input_color.rgb / (input_color.rgb + vec3(1.0));
+    return vec4(mapped, 1.0);
+}
+
+vec4 exposureToneMappingColor(vec4 input_color)
+{
+    vec3 mapped = vec3(1.0) - exp(-input_color.rgb * exposure);
+    return vec4(mapped, 1.0);
+}
+
+vec4 gammaColor(vec4 input_color)
+{                                                                                                                                                                                   
+    //vec4 screenColor = texture(screenTexture, TexCoords);
+    return vec4(pow(input_color.rgb, vec3(1.0/gamma)), 1.0);
 }
 
 vec4 sharpenColor()
@@ -97,7 +110,8 @@ vec4 edgeColor()
 
 void main()
 {
-    //FragColor = vec4(texture(screenTexture, TexCoords).rgb, 1.0);
-    //FragColor = gammaColor();
-    FragColor = grayScaleColor();
+    FragColor = vec4(texture(screenTexture, TexCoords).rgb, 1.0);
+    FragColor = exposureToneMappingColor(FragColor);
+    FragColor = gammaColor(FragColor);
+    //FragColor = grayScaleColor();
 }

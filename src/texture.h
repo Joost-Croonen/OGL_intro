@@ -98,7 +98,6 @@ public:
             }
             else if (nrChannels == 3) {
                 format = GL_RGB;
-                internalFormat = GL_RGB;
                 internalFormat = gamma_correct ? GL_SRGB : GL_RGB;
             }
             else if (nrChannels == 4) {
@@ -129,10 +128,25 @@ public:
             nrChannels = 1;
             pixelType = GL_FLOAT;
         }
-        else {
+        if (internalFormat == GL_RGB){
             dataFormat = GL_RGB;
             nrChannels = 3;
             pixelType = GL_UNSIGNED_BYTE;
+        }
+        if (internalFormat == GL_RGBA) {
+            dataFormat = GL_RGBA;
+            nrChannels = 4;
+            pixelType = GL_UNSIGNED_BYTE;
+        }
+        if (internalFormat == GL_RGB16F) {
+            dataFormat = GL_RGB;
+            nrChannels = 3;
+            pixelType = GL_FLOAT;
+        }
+        if (internalFormat == GL_RGBA16F) {
+            dataFormat = GL_RGBA;
+            nrChannels = 4;
+            pixelType = GL_FLOAT;
         }
         glGenTextures(1, &id);
         if (samples == 1)

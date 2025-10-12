@@ -184,10 +184,8 @@ public:
 
         // Setup indices
         unsigned int quadIndices[] = {
-            //0, 1, 2,
-            //0, 2, 3
-            3, 0, 1,
-            3, 1, 2
+            0, 1, 2,
+            0, 2, 3
         };
         for (int i = 0; i < 6; i++) {
             indices.push_back(quadIndices[i]);
@@ -203,55 +201,107 @@ public:
 
 class Cube : public Mesh {
 public:
-    Cube(glm::vec3 size, float texScale, Texture texture) {
+    Cube(glm::vec3 size, float texScale, std::vector<TextureData> textureDataList) {
         // Setup vertices
         float sizex = size.x / 2.0;
         float sizey = size.y / 2.0;
         float sizez = size.z / 2.0;
         float cubeVertices[] = {
-            // verts                     normals              texcoords
+            // verts                     normals              texcoords             tangent             bitangent
             // Front
-            -sizex, -sizey,  sizez,      0.0,  0.0,  1.0,     0       ,  0       ,   //0   
-             sizex, -sizey,  sizez,      0.0,  0.0,  1.0,     texScale,  0       ,   //1
-             sizex,  sizey,  sizez,      0.0,  0.0,  1.0,     texScale,  texScale,   //2
-            -sizex,  sizey,  sizez,      0.0,  0.0,  1.0,     0       ,  texScale,   //3
-             // Back
-            -sizex, -sizey, -sizez,      0.0,  0.0, -1.0,     0       ,  0       ,   //4
-             sizex, -sizey, -sizez,      0.0,  0.0, -1.0,     texScale,  0       ,   //5
-             sizex,  sizey, -sizez,      0.0,  0.0, -1.0,     texScale,  texScale,   //6
-            -sizex,  sizey, -sizez,      0.0,  0.0, -1.0,     0       ,  texScale,   //7
-             // Top
-            -sizex,  sizey,  sizez,      0.0,  1.0,  0.0,     0       ,  0       ,   //8
-             sizex,  sizey,  sizez,      0.0,  1.0,  0.0,     texScale,  0       ,   //9
-             sizex,  sizey, -sizez,      0.0,  1.0,  0.0,     texScale,  texScale,   //10
-            -sizex,  sizey, -sizez,      0.0,  1.0,  0.0,     0       ,  texScale,   //11
-             // Bottom                                
-            -sizex, -sizey,  sizez,      0.0, -1.0,  0.0,     0       ,  0       ,   //12
-             sizex, -sizey,  sizez,      0.0, -1.0,  0.0,     texScale,  0       ,   //13
-             sizex, -sizey, -sizez,      0.0, -1.0,  0.0,     texScale,  texScale,   //14
-            -sizex, -sizey, -sizez,      0.0, -1.0,  0.0,     0       ,  texScale,   //15
-             // Left                                  
-            -sizex, -sizey,  sizez,     -1.0,  0.0,  0.0,     0       ,  0       ,   //16
-            -sizex,  sizey,  sizez,     -1.0,  0.0,  0.0,     texScale,  0       ,   //17
-            -sizex,  sizey, -sizez,     -1.0,  0.0,  0.0,     texScale,  texScale,   //18
-            -sizex, -sizey, -sizez,     -1.0,  0.0,  0.0,     0       ,  texScale,   //19
-             // Right                                 
-             sizex, -sizey,  sizez,      1.0,  0.0,  0.0,     0       ,  0       ,   //20
-             sizex,  sizey,  sizez,      1.0,  0.0,  0.0,     texScale,  0       ,   //21
-             sizex,  sizey, -sizez,      1.0,  0.0,  0.0,     texScale,  texScale,   //22
-             sizex, -sizey, -sizez,      1.0,  0.0,  0.0,     0       ,  texScale    //23
+            -sizex, -sizey,  sizez,      0.0,  0.0,  1.0,     0       , 0       ,   1.0,  0.0,  0.0,    0.0,  1.0,  0.0,    //0   
+             sizex, -sizey,  sizez,      0.0,  0.0,  1.0,     texScale, 0       ,   1.0,  0.0,  0.0,    0.0,  1.0,  0.0,    //1
+             sizex,  sizey,  sizez,      0.0,  0.0,  1.0,     texScale, texScale,   1.0,  0.0,  0.0,    0.0,  1.0,  0.0,    //2
+            -sizex,  sizey,  sizez,      0.0,  0.0,  1.0,     0       , texScale,   1.0,  0.0,  0.0,    0.0,  1.0,  0.0,    //3
+             // Back                                                                                                
+            -sizex,  sizey, -sizez,      0.0,  0.0, -1.0,     0       , 0       ,   1.0,  0.0,  0.0,    0.0, -1.0,  0.0,    //7
+             sizex,  sizey, -sizez,      0.0,  0.0, -1.0,     texScale, 0       ,   1.0,  0.0,  0.0,    0.0, -1.0,  0.0,    //6
+             sizex, -sizey, -sizez,      0.0,  0.0, -1.0,     texScale, texScale,   1.0,  0.0,  0.0,    0.0, -1.0,  0.0,    //5
+            -sizex, -sizey, -sizez,      0.0,  0.0, -1.0,     0       , texScale,   1.0,  0.0,  0.0,    0.0, -1.0,  0.0,    //4
+             // Top                                                                                                 
+            -sizex,  sizey,  sizez,      0.0,  1.0,  0.0,     0       , 0       ,   1.0,  0.0,  0.0,    0.0,  0.0, -1.0,    //8
+             sizex,  sizey,  sizez,      0.0,  1.0,  0.0,     texScale, 0       ,   1.0,  0.0,  0.0,    0.0,  0.0, -1.0,    //9
+             sizex,  sizey, -sizez,      0.0,  1.0,  0.0,     texScale, texScale,   1.0,  0.0,  0.0,    0.0,  0.0, -1.0,    //10
+            -sizex,  sizey, -sizez,      0.0,  1.0,  0.0,     0       , texScale,   1.0,  0.0,  0.0,    0.0,  0.0, -1.0,    //11
+             // Bottom                                                                                              
+            -sizex, -sizey, -sizez,      0.0, -1.0,  0.0,     0       , 0       ,   1.0,  0.0,  0.0,    0.0,  0.0,  1.0,    //15
+             sizex, -sizey, -sizez,      0.0, -1.0,  0.0,     texScale, 0       ,   1.0,  0.0,  0.0,    0.0,  0.0,  1.0,    //14
+             sizex, -sizey,  sizez,      0.0, -1.0,  0.0,     texScale, texScale,   1.0,  0.0,  0.0,    0.0,  0.0,  1.0,    //13
+            -sizex, -sizey,  sizez,      0.0, -1.0,  0.0,     0       , texScale,   1.0,  0.0,  0.0,    0.0,  0.0,  1.0,    //12
+             // Left                                                                                                
+            -sizex, -sizey,  sizez,     -1.0,  0.0,  0.0,     0       , 0       ,   0.0,  0.0,  1.0,    0.0,  1.0,  0.0,    //16
+            -sizex,  sizey,  sizez,     -1.0,  0.0,  0.0,     0       , texScale,   0.0,  0.0,  1.0,    0.0,  1.0,  0.0,    //17
+            -sizex,  sizey, -sizez,     -1.0,  0.0,  0.0,     texScale, texScale,   0.0,  0.0,  1.0,    0.0,  1.0,  0.0,    //18
+            -sizex, -sizey, -sizez,     -1.0,  0.0,  0.0,     texScale, 0       ,   0.0,  0.0,  1.0,    0.0,  1.0,  0.0,    //19
+             // Right                                                                                               
+             sizex,  sizey,  sizez,      1.0,  0.0,  0.0,     0       , 0       ,   0.0,  0.0, -1.0,    0.0,  1.0,  0.0,    //21
+             sizex, -sizey,  sizez,      1.0,  0.0,  0.0,     0       , texScale,   0.0,  0.0, -1.0,    0.0,  1.0,  0.0,    //20
+             sizex, -sizey, -sizez,      1.0,  0.0,  0.0,     texScale, texScale,   0.0,  0.0, -1.0,    0.0,  1.0,  0.0,    //23
+             sizex,  sizey, -sizez,      1.0,  0.0,  0.0,     texScale, 0       ,   0.0,  0.0, -1.0,    0.0,  1.0,  0.0     //22
 
         };
         for (int i = 0; i < 24; i++) {
             Vertex vertex;
-            int offset = i * 8;
+            int offset = i * 14;
             vertex.Position = glm::vec3(cubeVertices[offset + 0], cubeVertices[offset + 1], cubeVertices[offset + 2]);
             offset += 3;
             vertex.Normal = glm::vec3(cubeVertices[offset + 0], cubeVertices[offset + 1], cubeVertices[offset + 2]);
             offset += 3;
             vertex.TexCoords = glm::vec2(cubeVertices[offset + 0], cubeVertices[offset + 1]);
+            offset += 2;
+            vertex.Tangent = glm::vec3(cubeVertices[offset + 0], cubeVertices[offset + 1], cubeVertices[offset + 2]);
+            offset += 3;
+            vertex.Bitangent = glm::vec3(cubeVertices[offset + 0], cubeVertices[offset + 1], cubeVertices[offset + 2]);
             vertices.push_back(vertex);
         }
+        /*
+        glm::vec3 edge1 = vertices[5].Position     - vertices[4].Position;
+        glm::vec3 edge2 = vertices[6].Position     - vertices[4].Position;
+        glm::vec2 deltaUV1 = vertices[5].TexCoords - vertices[4].TexCoords;
+        glm::vec2 deltaUV2 = vertices[6].TexCoords - vertices[4].TexCoords;
+
+        float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        float x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        float y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        float z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+
+        std::cout << x << std::endl;
+        std::cout << y << std::endl;
+        std::cout << z << std::endl;
+
+        x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
+        y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
+        z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+
+        std::cout << x << std::endl;
+        std::cout << y << std::endl;
+        std::cout << z << std::endl;
+
+        edge1 = vertices[6].Position -     vertices[4].Position;
+        edge2 = vertices[7].Position -     vertices[4].Position;
+        deltaUV1 = vertices[6].TexCoords - vertices[4].TexCoords;
+        deltaUV2 = vertices[7].TexCoords - vertices[4].TexCoords;
+
+        f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+        x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+        y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+        z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+
+        std::cout << x << std::endl;
+        std::cout << y << std::endl;
+        std::cout << z << std::endl;
+
+        x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
+        y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
+        z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+
+        std::cout << x << std::endl;
+        std::cout << y << std::endl;
+        std::cout << z << std::endl;
+        */
+        
 
         // Setup indices
         unsigned int cubeIndices[] = {
@@ -259,31 +309,32 @@ public:
             0, 1, 2,
             0, 2, 3,
             // Back
-            4, 6, 5,
-            4, 7, 6,
+            4, 5, 6,
+            4, 6, 7,
             // Top
             8, 9, 10,
             8, 10, 11,
             // Bottom
-            12, 14, 13,
-            12, 15, 14,
+            12, 13, 14,
+            12, 14, 15,
             // Left
             16, 17, 18,
             16, 18, 19,
             // Right
-            20, 22, 21,
-            20, 23, 22
+            20, 21, 22,
+            20, 22, 23
         };
         for (int i = 0; i < 36; i++) {
             indices.push_back(cubeIndices[i]);
         }
 
         // Setup textures
-        TextureData texdata;
-        texdata.id = texture.id;
-        texdata.type = "texture_diffuse";
-        texdata.path = "";
-        textures.push_back(texdata);
+        textures = textureDataList;
+        //TextureData texdata;
+        //texdata.id = texture.id;
+        //texdata.type = "texture_diffuse";
+        //texdata.path = "";
+        //textures.push_back(texdata);
 
         // Setup buffers
         setup_mesh();

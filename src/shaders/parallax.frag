@@ -2,12 +2,13 @@
 
 out vec4 FragColor; 
 
+#define MAX_LIGHTS 10 
 in vec3 FragPos;
 in vec3 Normal;
 in vec2 TexCoords;
 in mat3 invTBN;
 in vec3 tangentViewPos;
-in vec3 tangentLightPos;
+in vec3 tangentLightPos[MAX_LIGHTS];
 in vec3 tangentFragPos;
 
 struct Material{
@@ -24,7 +25,6 @@ struct PointLight{
     float attenuation_power;
 };
 
-#define MAX_LIGHTS 10 
 uniform Material material;
 uniform PointLight light[MAX_LIGHTS];
 uniform vec3 viewPos;
@@ -249,7 +249,7 @@ vec4 calc_light(int index)
     vec3 mapped_normal = texture(material.texture_normal1, parallaxCoords).rgb;
     mapped_normal = normalize(mapped_normal * 2.0 - 1.0);
     vec3 norm = normal_mapping ? mapped_normal : vert_normal;
-    vec3 lightDir = normalize(tangentLightPos - tangentFragPos);
+    vec3 lightDir = normalize(tangentLightPos[index] - tangentFragPos);
     vec3 diffuse = max(dot(lightDir, norm), 0.0) * diffuseColor;
     // specular
     vec3 halfVec = normalize(lightDir + viewDir);
