@@ -4,9 +4,11 @@ out vec4 FragColor;
 in vec2 TexCoords;
 
 uniform sampler2D screenTexture;
+uniform sampler2D bloomTexture;
 
 uniform float gamma;
 uniform float exposure;
+uniform bool bloom;
 
 const float offset = 1.0/360.0;
     
@@ -108,10 +110,19 @@ vec4 edgeColor()
     }
 }
 
+vec4 bloomColor()
+{
+    vec3 hdrColor = texture(screenTexture, TexCoords).rgb;
+    vec3 bloomColor = texture(bloomTexture, TexCoords).rgb;
+    return vec4(hdrColor + bloomColor, 1.0);
+}
+
 void main()
 {
     FragColor = vec4(texture(screenTexture, TexCoords).rgb, 1.0);
+    FragColor = bloom? bloomColor(): FragColor;
     FragColor = exposureToneMappingColor(FragColor);
     FragColor = gammaColor(FragColor);
+    //FragColor = vec4(texture(bloomTexture, TexCoords).rgb, 1.0);
     //FragColor = grayScaleColor();
 }

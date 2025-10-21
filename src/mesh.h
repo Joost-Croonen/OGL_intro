@@ -229,15 +229,15 @@ public:
              sizex, -sizey,  sizez,      0.0, -1.0,  0.0,     texScale, texScale,   1.0,  0.0,  0.0,    0.0,  0.0,  1.0,    //13
             -sizex, -sizey,  sizez,      0.0, -1.0,  0.0,     0       , texScale,   1.0,  0.0,  0.0,    0.0,  0.0,  1.0,    //12
              // Left                                                                                                
-            -sizex, -sizey,  sizez,     -1.0,  0.0,  0.0,     0       , 0       ,   0.0,  0.0,  1.0,    0.0,  1.0,  0.0,    //16
-            -sizex,  sizey,  sizez,     -1.0,  0.0,  0.0,     0       , texScale,   0.0,  0.0,  1.0,    0.0,  1.0,  0.0,    //17
-            -sizex,  sizey, -sizez,     -1.0,  0.0,  0.0,     texScale, texScale,   0.0,  0.0,  1.0,    0.0,  1.0,  0.0,    //18
-            -sizex, -sizey, -sizez,     -1.0,  0.0,  0.0,     texScale, 0       ,   0.0,  0.0,  1.0,    0.0,  1.0,  0.0,    //19
+            -sizex, -sizey, -sizez,     -1.0,  0.0,  0.0,     0       , 0       ,   0.0,  0.0,  1.0,    0.0,  1.0,  0.0,    //16
+            -sizex, -sizey,  sizez,     -1.0,  0.0,  0.0,     texScale, 0       ,   0.0,  0.0,  1.0,    0.0,  1.0,  0.0,    //17
+            -sizex,  sizey,  sizez,     -1.0,  0.0,  0.0,     texScale, texScale,   0.0,  0.0,  1.0,    0.0,  1.0,  0.0,    //18
+            -sizex,  sizey, -sizez,     -1.0,  0.0,  0.0,     0       , texScale,   0.0,  0.0,  1.0,    0.0,  1.0,  0.0,    //19
              // Right                                                                                               
-             sizex,  sizey,  sizez,      1.0,  0.0,  0.0,     0       , 0       ,   0.0,  0.0, -1.0,    0.0,  1.0,  0.0,    //21
-             sizex, -sizey,  sizez,      1.0,  0.0,  0.0,     0       , texScale,   0.0,  0.0, -1.0,    0.0,  1.0,  0.0,    //20
-             sizex, -sizey, -sizez,      1.0,  0.0,  0.0,     texScale, texScale,   0.0,  0.0, -1.0,    0.0,  1.0,  0.0,    //23
-             sizex,  sizey, -sizez,      1.0,  0.0,  0.0,     texScale, 0       ,   0.0,  0.0, -1.0,    0.0,  1.0,  0.0     //22
+             sizex, -sizey,  sizez,      1.0,  0.0,  0.0,     0       , 0       ,   0.0,  0.0, -1.0,    0.0,  1.0,  0.0,    //21
+             sizex, -sizey, -sizez,      1.0,  0.0,  0.0,     texScale, 0       ,   0.0,  0.0, -1.0,    0.0,  1.0,  0.0,    //20
+             sizex,  sizey, -sizez,      1.0,  0.0,  0.0,     texScale, texScale,   0.0,  0.0, -1.0,    0.0,  1.0,  0.0,    //23
+             sizex,  sizey,  sizez,      1.0,  0.0,  0.0,     0       , texScale,   0.0,  0.0, -1.0,    0.0,  1.0,  0.0     //22
 
         };
         for (int i = 0; i < 24; i++) {

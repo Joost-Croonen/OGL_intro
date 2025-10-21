@@ -42,6 +42,8 @@ bool normal_mapping = false;
 bool normal_mapping_key = false;
 float heightScale = 0.0f;
 float exposure = 1.0f;
+bool bloom = false;
+bool bloom_key = false;
 
 // camera
 //Camera camera(glm::vec3(1.0f, 1.5f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -100, -20);
@@ -2415,7 +2417,8 @@ int shadow_scene() {
         GL_NEAREST, GL_NEAREST, GL_CLAMP_TO_BORDER, GL_CLAMP_TO_BORDER, borderColor);
     shadowFBO.bind();
     shadowMap.attach(GL_DEPTH_ATTACHMENT);
-    shadowFBO.set_draw_read_buffer(false);
+    shadowFBO.set_draw_buffer(GL_NONE);
+    shadowFBO.set_read_buffer(GL_NONE);
     shadowFBO.unbind();
 
     // Lights
@@ -2654,7 +2657,8 @@ int point_shadow_scene() {
     Cubemap shadowCubeMap = Cubemap(SHADOW_WIDTH, SHADOW_HEIGHT, GL_DEPTH_COMPONENT);
     shadowFBO.bind();
     shadowCubeMap.attach(GL_DEPTH_ATTACHMENT);
-    shadowFBO.set_draw_read_buffer(false);
+    shadowFBO.set_draw_buffer(GL_NONE);
+    shadowFBO.set_read_buffer(GL_NONE);
     shadowFBO.unbind();
 
     // shader setup
@@ -3124,6 +3128,11 @@ int parallax_map_scene() {
         ourShader.setFloat("height_scale", heightScale);
         renderScene(ourShader);
 
+        tbnShader.use();
+        tbnShader.setMat4("view", view);
+        tbnShader.setMat4("projection", projection);
+        renderScene(tbnShader);
+
         if (post_process) ppo.draw_texture_to_screen();
 
         //depthShader.use();
@@ -3316,9 +3325,243 @@ int hdr_scene() {
     return 0;
 }
 
+int bloom_scene() {
+    // Variable setup
+    const unsigned int MS_SAMPLES = 1;
+    float gamma = 2.2;
+    bool manual_gamma = true;
+    bool gamma_correct = (gamma != 1.0);
+
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, MS_SAMPLES);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+
+    // OGL state setup --------------------------------------------------
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    //glEnable(GL_BLEND);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    if (MS_SAMPLES > 1) glEnable(GL_MULTISAMPLE);
+
+    if (gamma_correct && !manual_gamma) glEnable(GL_FRAMEBUFFER_SRGB);
+
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+
+    // Setup geometry, textures, buffers and shaders --------------------
+    // Vertices
+
+    // Shaders
+    Shader ourShader("../../../src/shaders/blinn_phong.vert", "../../../src/shaders/multirender_bp.frag");
+    Shader lightShader("../../../src/shaders/blinn_phong.vert", "../../../src/shaders/bloom_light.frag");
+    Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
+
+    // Load textures
+    Texture wood = Texture("../../../src/textures/wood.png", gamma_correct);
+    TextureData woodData = { wood.id, "texture_diffuse", wood.get_path() };
+    Texture container = Texture("../../../src/textures/container2.png", gamma_correct);
+    TextureData containerData = { container.id, "texture_diffuse", container.get_path() };
+
+    // Models & meshes
+    Model cube = Model(Cube(glm::vec3(2.0), 1.0, std::vector<TextureData>{woodData}));
+    Model box = Model(Cube(glm::vec3(2.0), 1.0, std::vector<TextureData>{containerData}));
+
+    // Lights
+    glm::vec3 lightPositions[] = {
+        glm::vec3(0.0f, 0.5f, 1.5f),
+        glm::vec3(-4.0f, 0.5f, -3.0f),
+        glm::vec3(3.0f, 0.5f, 1.0f),
+        glm::vec3(-.8f, 2.4f, -1.0f)
+    };
+    glm::vec3 lightColors[] = {
+        glm::vec3(5.0f,   5.0f,  5.0f),
+        glm::vec3(10.0f,  0.0f,  0.0f),
+        glm::vec3(0.0f,   0.0f,  15.0f),
+        glm::vec3(0.0f,   5.0f,  0.0f)
+    };
+
+    // Offscreen rendering setup
+    // Post processing
+    PPO ppo = PPO(screenShader, SCR_WIDTH, SCR_HEIGHT, MS_SAMPLES);
+
+    // shader setup
+    ourShader.use();
+    int num_lights = sizeof(lightPositions) / sizeof(lightPositions[0]);
+    ourShader.setInt("num_lights", num_lights);
+    for (int i = 0; i < num_lights; i++) {
+        ourShader.setVec3("light[" + std::to_string(i) + "].position", lightPositions[i]);
+        ourShader.setVec3("light[" + std::to_string(i) + "].color", lightColors[i]);
+        ourShader.setFloat("light[" + std::to_string(i) + "].attenuation_power", gamma_correct ? 2.0 : 1.0);
+    }
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    ourShader.setFloat("material.shininess", 64.0);
+
+
+    // Background
+    //glm::vec3 clear_color = glm::vec3(pow(0.1, gamma));
+    float clear_color[] = { pow(0.1, gamma), pow(0.1, gamma), pow(0.1, gamma), 1.0 };
+
+    auto renderScene = [&]() {
+        ourShader.use();
+        glm::mat4 model = glm::mat4(1.0f);
+        // create one large cube that acts as the floor
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, -1.0f, 0.0));
+        model = glm::scale(model, glm::vec3(12.5f, 0.5f, 12.5f));
+        ourShader.setMat4("model", model);
+        cube.Draw(ourShader);
+        // then create multiple cubes as the scenery
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 1.5f, 0.0));
+        model = glm::scale(model, glm::vec3(0.5f));
+        ourShader.setMat4("model", model);
+        box.Draw(ourShader);
+
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(2.0f, 0.0f, 1.0));
+        model = glm::scale(model, glm::vec3(0.5f));
+        ourShader.setMat4("model", model);
+        box.Draw(ourShader);
+
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(-1.0f, -1.0f, 2.0));
+        model = glm::rotate(model, glm::radians(60.0f), glm::normalize(glm::vec3(1.0, 0.0, 1.0)));
+        ourShader.setMat4("model", model);
+        box.Draw(ourShader);
+
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 2.7f, 4.0));
+        model = glm::rotate(model, glm::radians(23.0f), glm::normalize(glm::vec3(1.0, 0.0, 1.0)));
+        model = glm::scale(model, glm::vec3(1.25));
+        ourShader.setMat4("model", model);
+        box.Draw(ourShader);
+
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(-2.0f, 1.0f, -3.0));
+        model = glm::rotate(model, glm::radians(124.0f), glm::normalize(glm::vec3(1.0, 0.0, 1.0)));
+        ourShader.setMat4("model", model);
+        box.Draw(ourShader);
+
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(-3.0f, 0.0f, 0.0));
+        model = glm::scale(model, glm::vec3(0.5f));
+        ourShader.setMat4("model", model);
+        box.Draw(ourShader);
+
+        lightShader.use();
+        for (unsigned int i = 0; i < num_lights; i++)
+        {
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(lightPositions[i]));
+            model = glm::scale(model, glm::vec3(0.25f));
+            lightShader.setMat4("model", model);
+            lightShader.setVec3("lightColor", lightColors[i]);
+            cube.Draw(lightShader);
+        }
+        };
+
+    // Main render loop ---------------------------------------------------
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+
+        // Main render pass
+
+        if (post_process) ppo.start_render_to_texture();
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glClearBufferfv(GL_COLOR, 0, clear_color);
+        glEnable(GL_DEPTH_TEST);
+
+        glm::mat4 view = camera.GetViewMatrix();
+
+        ourShader.use();
+        ourShader.setVec3("viewPos", camera.Position);
+        ourShader.setMat4("view", view);
+        ourShader.setMat4("projection", projection);
+        lightShader.use();
+        lightShader.setMat4("view", view);
+        lightShader.setMat4("projection", projection);
+        renderScene();
+
+        screenShader.use();
+        screenShader.setFloat("gamma", gamma);
+        screenShader.setFloat("exposure", exposure);
+        screenShader.setFloat("bloom", bloom);
+
+        if (post_process) ppo.bloom();
+
+        if (post_process) ppo.draw_texture_to_screen();
+
+        //depthShader.use();
+        //shadowCubeMap.activate(ourShader, "shadowCubeMap", 1);
+        //screen.Draw();
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Terminate
+    cube.Delete();
+    ppo.Delete();
+    glfwTerminate();
+    return 0;
+}
+
 int main(void)
 {
-    switch (14)
+    switch (16)
     {
     case 0:  return base_scene(); break;
     case 1:  return main_scene(); break;
@@ -3336,6 +3579,7 @@ int main(void)
     case 13: return normal_map_scene(); break;
     case 14: return parallax_map_scene(); break;
     case 15: return hdr_scene(); break;
+    case 16: return bloom_scene(); break;
     }
 }
 
@@ -3375,6 +3619,14 @@ void processInput(GLFWwindow* window)
     }
     if (glfwGetKey(window, GLFW_KEY_N) == GLFW_RELEASE) {
         normal_mapping_key = false;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS && !bloom_key) {
+        bloom = !bloom;
+        bloom_key = true;
+    }
+    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_RELEASE) {
+        bloom_key = false;
     }
 
     if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)

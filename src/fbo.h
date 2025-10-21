@@ -19,17 +19,14 @@ public:
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, target);
 		glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 	}
-	void set_draw_read_buffer(bool flag) const {
-		if (!flag) {
-			glDrawBuffer(GL_NONE);
-			glReadBuffer(GL_NONE);
-		}
-		else {
-
-			glDrawBuffer(GL_FRONT);
-			glReadBuffer(GL_FRONT);
-		}
-
+	void set_draw_buffer(GLenum draw) const {
+		glDrawBuffer(draw);
+	}
+	void set_read_buffer(GLenum read) const {
+		glReadBuffer(read);
+	}
+	void multiDrawBuffers(int num, GLenum* attachments) {
+		glDrawBuffers(num, attachments);
 	}
 	void check_status() const {
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
