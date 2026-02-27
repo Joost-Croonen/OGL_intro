@@ -22,6 +22,7 @@
 #include "mesh.h"
 #include "model.h"
 #include "ppo.h"
+#include "gbo.h"
 
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -3559,9 +3560,198 @@ int bloom_scene() {
     return 0;
 }
 
+int deferred_scene() {
+    // Variable setup
+    const unsigned int MS_SAMPLES = 1;
+    float gamma = 2.2;
+    bool manual_gamma = false;
+    bool gamma_correct = (gamma != 1.0);
+
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, MS_SAMPLES);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+
+    // OGL state setup --------------------------------------------------
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    //glEnable(GL_BLEND);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    if (MS_SAMPLES > 1) glEnable(GL_MULTISAMPLE);
+
+    if (gamma_correct && !manual_gamma) glEnable(GL_FRAMEBUFFER_SRGB);
+
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+
+    // Setup geometry, textures, buffers and shaders --------------------
+    // Vertices
+
+    // Shaders
+    Shader geometryPassShader("../../../src/shaders/vertex.vert", "../../../src/shaders/deferred_geometry_pass.frag");
+    Shader lightingPassShader("../../../src/shaders/screen.vert", "../../../src/shaders/deferred_lighting_pass.frag");
+    Shader ppfxShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
+
+    // Load textures
+
+    // Models & meshes
+    Model backpack("../../../src/models/backpack/backpack.obj");
+    std::vector<glm::vec3> objectPositions;
+    objectPositions.push_back(glm::vec3(-3.0, -0.5, -3.0));
+    objectPositions.push_back(glm::vec3(0.0, -0.5, -3.0));
+    objectPositions.push_back(glm::vec3(3.0, -0.5, -3.0));
+    objectPositions.push_back(glm::vec3(-3.0, -0.5, 0.0));
+    objectPositions.push_back(glm::vec3(0.0, -0.5, 0.0));
+    objectPositions.push_back(glm::vec3(3.0, -0.5, 0.0));
+    objectPositions.push_back(glm::vec3(-3.0, -0.5, 3.0));
+    objectPositions.push_back(glm::vec3(0.0, -0.5, 3.0));
+    objectPositions.push_back(glm::vec3(3.0, -0.5, 3.0));
+
+    // Lights
+    const unsigned int NR_LIGHTS = 4;
+    std::vector<glm::vec3> lightPositions;
+    std::vector<glm::vec3> lightColors;
+    srand(13);
+    for (unsigned int i = 0; i < NR_LIGHTS; i++)
+    {
+        // calculate slightly random offsets
+        float xPos = static_cast<float>(((rand() % 100) / 100.0) * 6.0 - 3.0);
+        float yPos = static_cast<float>(((rand() % 100) / 100.0) * 6.0 - 4.0);
+        float zPos = static_cast<float>(((rand() % 100) / 100.0) * 6.0 - 3.0);
+        lightPositions.push_back(glm::vec3(xPos, yPos, zPos));
+        // also calculate random color
+        float rColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5); // between 0.5 and 1.0
+        float gColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5); // between 0.5 and 1.0
+        float bColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5); // between 0.5 and 1.0
+        lightColors.push_back(glm::vec3(rColor, gColor, bColor));
+    }
+
+    // Render object setup
+    PPO ppo = PPO(ppfxShader, SCR_WIDTH, SCR_HEIGHT, MS_SAMPLES);
+    GBO GBuffer = GBO(SCR_WIDTH, SCR_HEIGHT, geometryPassShader, lightingPassShader);
+
+    // shader setup
+
+
+    // Background
+    float clear_color[] = { pow(0.1, gamma), pow(0.1, gamma), pow(0.1, gamma), 1.0 };
+
+
+    // Main render loop ---------------------------------------------------
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+
+        // Geometry Pass
+        GBuffer.geometry_pass();
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClearBufferfv(GL_COLOR, 0, clear_color);
+        glEnable(GL_DEPTH_TEST);
+
+        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        glm::mat4 model = glm::mat4(1.0f);
+
+        geometryPassShader.use();
+
+        for (unsigned int i = 0; i < objectPositions.size(); i++)
+        {
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, objectPositions[i]);
+            model = glm::scale(model, glm::vec3(0.5f));
+            geometryPassShader.setMat4("model", model);
+            geometryPassShader.setMat4("view", view);
+            geometryPassShader.setMat4("projection", projection);
+            backpack.Draw(geometryPassShader);
+        }
+
+       
+
+        // Deferred Lighting Pass
+         // Update light uniforms
+        lightingPassShader.use();
+        lightingPassShader.setVec3("viewPos", camera.Position);
+        for (unsigned int i = 0; i < lightPositions.size(); i++)
+        {
+            lightingPassShader.setVec3("lights[" + std::to_string(i) + "].position", lightPositions[i]);
+            lightingPassShader.setVec3("lights[" + std::to_string(i) + "].color", lightColors[i]);
+            lightingPassShader.setFloat("lights[" + std::to_string(i) + "].attenuation", gamma_correct ? 2.0 : 1.0);
+        }
+        GBuffer.lighting_pass();
+
+        // Forward overlay pass
+
+
+        
+        //depthShader.use();
+        //shadowCubeMap.activate(ourShader, "shadowCubeMap", 1);
+        //screen.Draw();
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Terminate
+    ppo.Delete();
+    GBuffer.Delete();
+    glfwTerminate();
+    return 0;
+}
+
 int main(void)
 {
-    switch (16)
+    switch (17)
     {
     case 0:  return base_scene(); break;
     case 1:  return main_scene(); break;
@@ -3580,6 +3770,7 @@ int main(void)
     case 14: return parallax_map_scene(); break;
     case 15: return hdr_scene(); break;
     case 16: return bloom_scene(); break;
+    case 17: return deferred_scene(); break;
     }
 }
 
