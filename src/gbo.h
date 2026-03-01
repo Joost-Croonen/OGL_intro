@@ -25,6 +25,7 @@ public:
     Texture albedoSpecGBuffer;
     Texture normalGbuffer;
     Texture positionGbuffer;
+    //Texture depthTex;
     Shader gbufferShader;
     Shader deferredShader;
     GBO(int width, int height, Shader gBufferShader, Shader deferredShader) :
@@ -35,10 +36,11 @@ public:
         vao(VAO()),
         vbo(VBO(screenVertices, sizeof(screenVertices))),
         ebo(EBO(screenIndices, sizeof(screenIndices))),
-        rbo(RBO(width, height, GL_DEPTH_COMPONENT, 1)),
+        rbo(RBO(width, height, GL_DEPTH24_STENCIL8, 1)),
         albedoSpecGBuffer(Texture(width, height, GL_RGBA, 1, GL_NEAREST, GL_NEAREST, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE)),
         normalGbuffer(Texture(width, height, GL_RGBA16F, 1, GL_NEAREST, GL_NEAREST, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE)),
         positionGbuffer(Texture(width, height, GL_RGBA16F, 1, GL_NEAREST, GL_NEAREST, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE))
+        //depthTex(Texture(width, height, GL_DEPTH_COMPONENT, 1, GL_NEAREST, GL_NEAREST, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE))
     {
         vao.bind();
         vao.linkVBO(vbo);
@@ -47,12 +49,13 @@ public:
         vao.unbind();
 
         fbo.bind();
+        //depthTex.attach(GL_DEPTH_ATTACHMENT);
         positionGbuffer.attach(GL_COLOR_ATTACHMENT0);
         normalGbuffer.attach(GL_COLOR_ATTACHMENT1);
         albedoSpecGBuffer.attach(GL_COLOR_ATTACHMENT2); 
         GLenum attachments[3] = { GL_COLOR_ATTACHMENT0 , GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
         fbo.multiDrawBuffers(3, attachments);
-        rbo.attach(GL_DEPTH_ATTACHMENT);
+        rbo.attach(GL_DEPTH_STENCIL_ATTACHMENT);
         fbo.check_status();
         fbo.unbind();
     }
@@ -61,13 +64,14 @@ public:
         fbo.bind();
     }
 
-    void lighting_pass() {
+    void lighting_pass(unsigned int id) {
         fbo.unbind();
-        glViewport(0, 0, width, height);
+        glBindFramebuffer(GL_FRAMEBUFFER, id);
+        //glViewport(0, 0, width, height);
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        //glDisable(GL_DEPTH_TEST);     // Why was this here in the first place? 
-
+        glDisable(GL_DEPTH_TEST);     // Why was this here in the first place? 
+        glDepthMask(GL_FALSE);
         deferredShader.use();
         positionGbuffer.activate(deferredShader, "gPosition", 0);
         normalGbuffer.activate(deferredShader, "gNormal", 1);
@@ -75,6 +79,9 @@ public:
         vao.bind();
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         vao.unbind();
+        glDepthMask(GL_TRUE);
+        glEnable(GL_DEPTH_TEST);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
     void Delete() {

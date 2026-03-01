@@ -14,10 +14,11 @@ public:
 	void unbind() const{
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
-	void blit(unsigned int width, unsigned int height, unsigned int target = 0)	const {
+	void blit(unsigned int width, unsigned int height, unsigned int target = 0, GLenum type = GL_COLOR_BUFFER_BIT)	const {
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, id);
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, target);
-		glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+		glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, type, GL_NEAREST);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 	void set_draw_buffer(GLenum draw) const {
 		glDrawBuffer(draw);

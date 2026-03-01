@@ -13,7 +13,7 @@ struct light {
 	float attenuation;
 };
 
-const int NR_LIGHTS = 4;
+const int NR_LIGHTS = 32;
 uniform light lights[NR_LIGHTS];
 uniform vec3 viewPos;
 
@@ -27,7 +27,7 @@ void main()
 	// lighting
 	vec3 norm = normalize(Normal);
 	vec3 viewDir = normalize(viewPos - FragPos);
-	vec3 lighting = Albedo * 0.0;		// crappy ambient light
+	vec3 lighting = Albedo * 0.1;		// crappy ambient light
 	for(int i = 0; i < NR_LIGHTS; ++i)
 	{
 		// attentunation

@@ -48,7 +48,7 @@ bool bloom_key = false;
 
 // camera
 //Camera camera(glm::vec3(1.0f, 1.5f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -100, -20);
-Camera camera(glm::vec3(0.0f, 0.0f, 5.0f), glm::vec3(0.0f, 1.0f, 0.0f), -100, -20);
+Camera camera(glm::vec3(0.0f, 0.0f, 2.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90, 0);
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -3564,7 +3564,7 @@ int deferred_scene() {
     // Variable setup
     const unsigned int MS_SAMPLES = 1;
     float gamma = 2.2;
-    bool manual_gamma = false;
+    bool manual_gamma = true;
     bool gamma_correct = (gamma != 1.0);
 
     // Initialse GLFW
@@ -3575,9 +3575,13 @@ int deferred_scene() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_SAMPLES, MS_SAMPLES);
-
+    
     // Create and verify window 
     GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+    int fbWidth, fbHeight;
+    glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+    std::cout << "SCR: " << SCR_WIDTH << "x" << SCR_HEIGHT << std::endl;
+    std::cout << "Framebuffer: " << fbWidth << "x" << fbHeight << std::endl;
 
     if (window == NULL)
     {
@@ -3632,11 +3636,16 @@ int deferred_scene() {
     // Shaders
     Shader geometryPassShader("../../../src/shaders/vertex.vert", "../../../src/shaders/deferred_geometry_pass.frag");
     Shader lightingPassShader("../../../src/shaders/screen.vert", "../../../src/shaders/deferred_lighting_pass.frag");
+    Shader lightBoxShader("../../../src/shaders/simple.vert", "../../../src/shaders/solid.frag");
+    Shader depthShader("../../../src/shaders/screen.vert", "../../../src/shaders/depth_debug.frag");
+    Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/screen.frag");
     Shader ppfxShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
 
     // Load textures
 
     // Models & meshes
+    Model cube = Model(Cube(glm::vec3(2.0), 1.0, std::vector<TextureData>{}));
+    ScreenQuad screen = ScreenQuad();
     Model backpack("../../../src/models/backpack/backpack.obj");
     std::vector<glm::vec3> objectPositions;
     objectPositions.push_back(glm::vec3(-3.0, -0.5, -3.0));
@@ -3650,7 +3659,7 @@ int deferred_scene() {
     objectPositions.push_back(glm::vec3(3.0, -0.5, 3.0));
 
     // Lights
-    const unsigned int NR_LIGHTS = 4;
+    const unsigned int NR_LIGHTS = 32;
     std::vector<glm::vec3> lightPositions;
     std::vector<glm::vec3> lightColors;
     srand(13);
@@ -3693,8 +3702,10 @@ int deferred_scene() {
         // Rendering
 
         // Geometry Pass
-        GBuffer.geometry_pass();
         glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        GBuffer.geometry_pass();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glClearBufferfv(GL_COLOR, 0, clear_color);
         glEnable(GL_DEPTH_TEST);
@@ -3702,9 +3713,9 @@ int deferred_scene() {
         glm::mat4 view = camera.GetViewMatrix();
         glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 model = glm::mat4(1.0f);
-
+        
         geometryPassShader.use();
-
+        
         for (unsigned int i = 0; i < objectPositions.size(); i++)
         {
             model = glm::mat4(1.0f);
@@ -3715,11 +3726,9 @@ int deferred_scene() {
             geometryPassShader.setMat4("projection", projection);
             backpack.Draw(geometryPassShader);
         }
-
-       
-
+        
         // Deferred Lighting Pass
-         // Update light uniforms
+        // Update light uniforms
         lightingPassShader.use();
         lightingPassShader.setVec3("viewPos", camera.Position);
         for (unsigned int i = 0; i < lightPositions.size(); i++)
@@ -3728,15 +3737,39 @@ int deferred_scene() {
             lightingPassShader.setVec3("lights[" + std::to_string(i) + "].color", lightColors[i]);
             lightingPassShader.setFloat("lights[" + std::to_string(i) + "].attenuation", gamma_correct ? 2.0 : 1.0);
         }
-        GBuffer.lighting_pass();
-
-        // Forward overlay pass
-
+        GBuffer.lighting_pass(ppo.renderBuffer.id);
 
         
+
+        // Forward overlay pass
+        GBuffer.fbo.blit(SCR_WIDTH, SCR_HEIGHT, ppo.renderBuffer.id, GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
         //depthShader.use();
-        //shadowCubeMap.activate(ourShader, "shadowCubeMap", 1);
         //screen.Draw();
+        ppo.renderBuffer.bind();
+
+        lightBoxShader.use();
+        lightBoxShader.setMat4("projection", projection);
+        lightBoxShader.setMat4("view", view);
+        for (unsigned int i = 0; i < lightPositions.size(); i++)
+        {
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, lightPositions[i]);
+            model = glm::scale(model, glm::vec3(0.25f));
+            lightBoxShader.setMat4("model", model);
+            lightBoxShader.setVec3("color", lightColors[i]);
+            cube.Draw(lightBoxShader);
+        }
+        ppo.renderBuffer.unbind();
+
+        //screenShader.use();
+        //ppo.renderTexture.activate(screenShader, "screenTexture", 0);
+        //screen.Draw();
+        ppfxShader.use();
+        ppfxShader.setFloat("gamma", gamma);
+        ppfxShader.setFloat("exposure", exposure);
+        ppfxShader.setFloat("bloom", bloom); 
+        ppo.draw_texture_to_screen();
 
         // Swap buffers and poll for IO events
         glfwSwapBuffers(window);

@@ -30,6 +30,7 @@ public:
     Texture brightTexture;
     Texture pingTexture;
     Texture pongTexture;
+    Texture depthTexture;
     Shader screenShader;
     Shader bloomShader;
     PPO(Shader shader, int width, int height, int num_samples=1):
@@ -50,7 +51,8 @@ public:
         screenTexture(Texture(width, height, GL_RGB16F, 1, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE)),
         brightTexture(Texture(width, height, GL_RGB16F, 1, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE)),
         pingTexture(Texture(width, height, GL_RGB16F, 1, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE)),
-        pongTexture(Texture(width, height, GL_RGB16F, 1, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE))
+        pongTexture(Texture(width, height, GL_RGB16F, 1, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE)),
+        depthTexture(Texture(width, height, GL_DEPTH_COMPONENT, 1, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE))
     {
         vao.bind();
         vao.linkVBO(vbo);
@@ -69,6 +71,7 @@ public:
         
         screenBuffer.bind();
         screenTexture.attach(GL_COLOR_ATTACHMENT0);
+        depthTexture.attach(GL_DEPTH_ATTACHMENT);
         screenBuffer.check_status();
         screenBuffer.unbind();
 
@@ -88,6 +91,17 @@ public:
         static const float black[] = { 0.0, 0.0, 0.0, 1.0 };
         glClearBufferfv(GL_COLOR, 1, black); // ensure bloom buffer has black clearcolor
         // glEnable(GL_DEPTH_TEST);     // Why was this here in the first place? 
+    }
+
+    void set_render_buffer(FBO fbo) {
+        fbo.blit(width, height, renderBuffer.id);
+    }
+
+    void finalize_render_to_texture() {
+        renderBuffer.bind();
+        renderBuffer.blit(width, height, screenBuffer.id);
+        renderBuffer.blit(width, height, screenBuffer.id, GL_DEPTH_COMPONENT);
+        renderBuffer.unbind();
     }
 
     void draw_texture_to_screen() {
