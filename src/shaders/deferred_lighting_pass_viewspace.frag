@@ -22,20 +22,19 @@ bool ssao;
 void main()	
 {
 	// retrieve from gbuffer
-	vec3 FragPos = texture(gPosition, TexCoords).rgb;
-	vec3 Normal = texture(gNormal, TexCoords).rgb;
-	vec3 Albedo = texture(gAlbedoSpec, TexCoords).rgb;
+	vec3 FragPos = texture(gPosition, TexCoords).rgb;			//view
+	vec3 Normal = texture(gNormal, TexCoords).rgb;				//view
+	vec3 Albedo = texture(gAlbedoSpec, TexCoords).rgb;			
 	float Specular = texture(gAlbedoSpec, TexCoords).a;
-	float ambient_occlusion = 1;
-	if (ssao) ambient_occlusion = texture(ssaoColorBuffer, TexCoords).r;
+	float ambient_occlusion = texture(ssaoColorBuffer, TexCoords).r;
 	// lighting
-	vec3 norm = normalize(Normal);
-	vec3 viewDir = normalize(viewPos - FragPos);
-	vec3 lighting = Albedo * ambient_occlusion * 0.01;		// crappy ambient light
+	vec3 norm = normalize(Normal);								//view
+	vec3 viewDir = normalize(- FragPos);						//view  !viewPos = (0,0,0)!
+	vec3 lighting = Albedo * ambient_occlusion * 0.1;		
 	for(int i = 0; i < NR_LIGHTS; ++i)
 	{
 		// attentunation
-		float dist = length(lights[i].position - FragPos);
+		float dist = length(lights[i].position - FragPos);		// light is now in viewpos!!
 		float attenuation = 1.0 / pow(dist, lights[i].attenuation);
 		// Diffuse
 		vec3 lightDir = normalize(lights[i].position - FragPos);

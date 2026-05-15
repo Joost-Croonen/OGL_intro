@@ -115,8 +115,64 @@ public:
         glActiveTexture(GL_TEXTURE0);
 	}
 
+    Texture(unsigned int width, unsigned int height, GLenum internalFormat, std::vector<glm::vec3> *data,
+        GLint min_filt = GL_LINEAR, GLint mag_filt = GL_LINEAR, 
+        GLint wrap_s = GL_REPEAT, GLint wrap_t = GL_REPEAT, float borderColor[4] = DEFAULT_BORDER_COLOR) :
+        albedoPath(""), width(width), height(height), samples(1), nrChannels(1)
+    {
+        GLenum dataFormat;
+        GLenum pixelType;
+        if (internalFormat == GL_DEPTH_COMPONENT)
+        {
+            dataFormat = internalFormat;
+            nrChannels = 1;
+            pixelType = GL_FLOAT;
+        }
+        if (internalFormat == GL_RED)
+        {
+            dataFormat = internalFormat;
+            nrChannels = 1;
+            pixelType = GL_FLOAT;
+        }
+        if (internalFormat == GL_R32F)
+        {
+            dataFormat = GL_RED;
+            nrChannels = 1;
+            pixelType = GL_FLOAT;
+        }
+        if (internalFormat == GL_RGB){
+            dataFormat = GL_RGB;
+            nrChannels = 3;
+            pixelType = GL_UNSIGNED_BYTE;
+        }
+        if (internalFormat == GL_RGBA) {
+            dataFormat = GL_RGBA;
+            nrChannels = 4;
+            pixelType = GL_UNSIGNED_BYTE;
+        }
+        if (internalFormat == GL_RGB16F) {
+            dataFormat = GL_RGB;
+            nrChannels = 3;
+            pixelType = GL_FLOAT;
+        }
+        if (internalFormat == GL_RGBA16F) {
+            dataFormat = GL_RGBA;
+            nrChannels = 4;
+            pixelType = GL_FLOAT;
+        }
+        glGenTextures(1, &id);
+        glBindTexture(GL_TEXTURE_2D, id);
+        glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, this->width, this->height, 0, dataFormat, pixelType, data->data());
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filt);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filt);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_s);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_t);
+        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+
     Texture(unsigned int width, unsigned int height, GLenum internalFormat, unsigned int samples = 1,
-        GLint min_filt=GL_LINEAR, GLint mag_filt=GL_LINEAR, 
+        GLint min_filt = GL_LINEAR, GLint mag_filt = GL_LINEAR,
         GLint wrap_s = GL_REPEAT, GLint wrap_t = GL_REPEAT, float borderColor[4] = DEFAULT_BORDER_COLOR) :
         albedoPath(""), width(width), height(height), samples(samples), nrChannels(1)
     {
@@ -128,7 +184,19 @@ public:
             nrChannels = 1;
             pixelType = GL_FLOAT;
         }
-        if (internalFormat == GL_RGB){
+        if (internalFormat == GL_RED)
+        {
+            dataFormat = internalFormat;
+            nrChannels = 1;
+            pixelType = GL_FLOAT;
+        }
+        if (internalFormat == GL_R32F)
+        {
+            dataFormat = GL_RED;
+            nrChannels = 1;
+            pixelType = GL_FLOAT;
+        }
+        if (internalFormat == GL_RGB) {
             dataFormat = GL_RGB;
             nrChannels = 3;
             pixelType = GL_UNSIGNED_BYTE;
@@ -160,13 +228,13 @@ public:
             glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
             glBindTexture(GL_TEXTURE_2D, 0);
         }
-        else 
+        else
         {
             glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, id);
             glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, samples, internalFormat, this->width, this->height, GL_TRUE);
             glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, 0);
         }
-        
+
     }
 
     void activate(Shader shader, const char* name, unsigned int texture_unit) const

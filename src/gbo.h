@@ -65,13 +65,13 @@ public:
     }
 
     void lighting_pass(unsigned int id) {
-        fbo.unbind();
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glBindFramebuffer(GL_FRAMEBUFFER, id);
         //glViewport(0, 0, width, height);
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glDisable(GL_DEPTH_TEST);     // Why was this here in the first place? 
-        glDepthMask(GL_FALSE);
+        //glDisable(GL_DEPTH_TEST);     // Why was this here in the first place? 
+        //glDepthMask(GL_FALSE);
         deferredShader.use();
         positionGbuffer.activate(deferredShader, "gPosition", 0);
         normalGbuffer.activate(deferredShader, "gNormal", 1);

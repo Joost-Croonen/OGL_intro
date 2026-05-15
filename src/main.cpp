@@ -9,6 +9,7 @@
 #include <iostream>
 #include <vector>
 #include <map>
+#include <random>
 
 #include "vbo.h"
 #include "ebo.h"
@@ -29,6 +30,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
+float lerp(float a, float b, float f);
 
 // settings
 const unsigned int SCR_WIDTH = 2560;
@@ -3782,9 +3784,299 @@ int deferred_scene() {
     return 0;
 }
 
+int ssao_scene() {
+    // Variable setup
+    const unsigned int MS_SAMPLES = 1;
+    float gamma = 2.2;      // best to use 2.2
+    bool manual_gamma = true;
+    bool gamma_correct = (gamma == 2.2);
+
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, MS_SAMPLES);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+    int fbWidth, fbHeight;
+    glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+    std::cout << "SCR: " << SCR_WIDTH << "x" << SCR_HEIGHT << std::endl;
+    std::cout << "Framebuffer: " << fbWidth << "x" << fbHeight << std::endl;
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+
+    // OGL state setup --------------------------------------------------
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    //glEnable(GL_BLEND);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    if (MS_SAMPLES > 1) glEnable(GL_MULTISAMPLE);
+
+    if (gamma_correct && !manual_gamma) glEnable(GL_FRAMEBUFFER_SRGB);
+
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+
+    // Setup geometry, textures, buffers and shaders --------------------
+    // Vertices
+
+    // Shaders
+    Shader geometryPassShader("../../../src/shaders/vertex_viewspace.vert", "../../../src/shaders/deferred_geometry_pass.frag");
+    Shader lightingPassShader("../../../src/shaders/screen.vert", "../../../src/shaders/deferred_lighting_pass_viewspace.frag");
+    Shader ssaoShader("../../../src/shaders/screen.vert", "../../../src/shaders/ssao.frag");
+    Shader ssaoBlurShader("../../../src/shaders/screen.vert", "../../../src/shaders/ssaoBlur.frag");
+    Shader ppfxShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
+    Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/ssao_visualiser.frag");
+
+    // Load textures
+    Texture wood = Texture("../../../src/textures/wood.png", gamma_correct);
+    TextureData woodData = { wood.id, "texture_diffuse", wood.get_path() };
+
+    // Models & meshes
+    Model cube = Model(Cube(glm::vec3(2.0), 1.0, std::vector<TextureData>{woodData}));
+    ScreenQuad screen = ScreenQuad();
+    Model backpack("../../../src/models/backpack/backpack.obj");
+
+    // Lights
+    const unsigned int NR_LIGHTS = 32;
+    std::vector<glm::vec3> lightPositions;
+    std::vector<glm::vec3> lightColors;
+
+    lightPositions.push_back(glm::vec3(2.0, 4.0, -2.0));
+    lightColors.push_back(glm::vec3(0.3, 0.3, 0.9));
+
+    // Render object setup
+    PPO ppo = PPO(ppfxShader, SCR_WIDTH, SCR_HEIGHT, MS_SAMPLES);
+    GBO GBuffer = GBO(SCR_WIDTH, SCR_HEIGHT, geometryPassShader, lightingPassShader);
+    FBO ssaoFBO = FBO();
+    Texture ssaoColorBuffer = Texture(SCR_WIDTH, SCR_HEIGHT, GL_RED, 1, GL_NEAREST, GL_NEAREST);
+    ssaoFBO.bind();
+    ssaoColorBuffer.attach(GL_COLOR_ATTACHMENT0);
+    ssaoFBO.check_status();
+    ssaoFBO.unbind();
+    FBO ssaoBlurFBO = FBO();
+    Texture ssaoBlurBuffer = Texture(SCR_WIDTH, SCR_HEIGHT, GL_RED, 1, GL_NEAREST, GL_NEAREST);
+    ssaoBlurFBO.bind();
+    ssaoBlurBuffer.attach(GL_COLOR_ATTACHMENT0);
+    ssaoBlurFBO.check_status();
+    ssaoBlurFBO.unbind();
+
+    // shader setup
+
+    // SSAO setup
+    // These samples are not properly distributed. 
+    // By sampling a cube and reshaping to a sphere there is oversampling near the corners of the original cube. 
+    // Instead, use rejeciton sampling, or sample phi/theta/rho in correct proportions. 
+    int ssaoKernelSize = 64;
+    std::uniform_real_distribution<float> randomFloats(0.0, 1.0);
+    std::default_random_engine generator;
+    std::vector<glm::vec3> ssaoKernel;
+    for (unsigned int i = 0; i < ssaoKernelSize; ++i)
+    {
+        glm::vec3 sample(
+            randomFloats(generator) * 2.0 - 1.0,
+            randomFloats(generator) * 2.0 - 1.0,
+            randomFloats(generator));
+        sample = glm::normalize(sample);
+        sample *= randomFloats(generator); 
+        float scale = (float)i / 64.0;
+        scale = lerp(0.1f, 1.0f, scale * scale);
+        sample *= scale;
+        ssaoKernel.push_back(sample);
+    }
+
+    int ssaoNoiseSize = 4;
+    std::vector<glm::vec3> ssaoNoise;
+    for (unsigned int i = 0; i < 16; i++) {
+        glm::vec3 noise(
+            randomFloats(generator) * 2.0 - 1.0,
+            randomFloats(generator) * 2.0 - 1.0,
+            0.0);
+        ssaoNoise.push_back(noise);
+    }
+
+    Texture ssaoNoiseTexture = Texture(ssaoNoiseSize, ssaoNoiseSize, GL_RGB16F, &ssaoNoise, GL_NEAREST, GL_NEAREST, GL_REPEAT, GL_REPEAT);
+
+    auto vec3ToString = [](const glm::vec3& v) -> std::string {
+        return "(" + std::to_string(v.x) + ", "
+            + std::to_string(v.y) + ", "
+            + std::to_string(v.z) + ")";
+        };
+
+    // Background
+    float clear_color[] = { pow(0.1, gamma), pow(0.1, gamma), pow(0.1, gamma), 1.0 };
+
+
+    // Main render loop ---------------------------------------------------
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+
+        // Geometry Pass
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        GBuffer.geometry_pass();
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClearBufferfv(GL_COLOR, 0, clear_color);
+        glEnable(GL_DEPTH_TEST);
+
+        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        glm::mat4 model = glm::mat4(1.0f);
+
+        geometryPassShader.use();
+
+        // Update geometry uniforms
+        // view and projection
+        geometryPassShader.setMat4("view", view);
+        geometryPassShader.setMat4("projection", projection);
+        // model
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0, 7.0f, 0.0f));
+        model = glm::scale(model, glm::vec3(7.5f, 7.5f, 7.5f));
+        geometryPassShader.setMat4("model", model);
+        geometryPassShader.setInt("invertedNormals", 1); // invert normals as we're inside the cube
+        glFrontFace(GL_CW);
+        cube.Draw(geometryPassShader);
+        geometryPassShader.setInt("invertedNormals", 0); // reset to correct normals 
+        glFrontFace(GL_CCW);
+
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 0.5f, 0.0));
+        model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
+        model = glm::scale(model, glm::vec3(1.0f));
+        geometryPassShader.setMat4("model", model);
+        backpack.Draw(geometryPassShader);
+
+
+        // SSAO pass
+        ssaoFBO.bind();
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        ssaoShader.use();
+        GBuffer.positionGbuffer.activate(ssaoShader, "gPosition", 0);
+        GBuffer.normalGbuffer.activate(ssaoShader, "gNormal", 1);
+        GBuffer.albedoSpecGBuffer.activate(ssaoShader, "gAlbedoSpec", 2);
+        ssaoNoiseTexture.activate(ssaoShader, "ssaoNoise", 3);
+        ssaoShader.setMat4("projection", projection);
+        for (unsigned int i = 0; i < ssaoKernel.size(); i++) {
+            ssaoShader.setVec3("samples[" + std::to_string(i) + "]", ssaoKernel[i]);
+        }
+        ssaoShader.setInt("kernelSize", ssaoKernelSize);
+        ssaoShader.setFloat("radius", 0.5);
+        ssaoShader.setFloat("bias", 0.025);
+        ssaoShader.setFloat("occlusionStrength", 1.0);
+        screen.Draw();
+        ssaoFBO.unbind();
+
+        ssaoBlurFBO.bind();
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        ssaoBlurShader.use();
+        ssaoColorBuffer.activate(ssaoBlurShader, "ssaoInput", 0);
+        ssaoBlurShader.setInt("ssaoNoiseSize", ssaoNoiseSize);
+        screen.Draw();
+        ssaoBlurFBO.unbind();
+
+
+        // Deferred Lighting Pass
+        // Update light uniforms
+        lightingPassShader.use();
+        lightingPassShader.setVec3("viewPos", camera.Position);
+        for (unsigned int i = 0; i < lightPositions.size(); i++)
+        {
+            lightingPassShader.setVec3("lights[" + std::to_string(i) + "].position", lightPositions[i]);
+            lightingPassShader.setVec3("lights[" + std::to_string(i) + "].color", lightColors[i]);
+            lightingPassShader.setFloat("lights[" + std::to_string(i) + "].attenuation", gamma_correct ? 2.0 : 1.0);
+        }
+        ssaoBlurBuffer.activate(lightingPassShader, "ssaoColorBuffer", 3);
+        lightingPassShader.setBool("ssao", true);
+        //calculate lighting
+        GBuffer.lighting_pass(ppo.renderBuffer.id);
+
+
+        // Forward overlay pass
+        GBuffer.fbo.blit(SCR_WIDTH, SCR_HEIGHT, ppo.renderBuffer.id, GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+        ppo.renderBuffer.bind();
+        // add overlay elements here
+        ppo.renderBuffer.unbind();
+
+        
+        // draw to screen
+        ppfxShader.use();
+        ppfxShader.setFloat("gamma", gamma);
+        ppfxShader.setFloat("exposure", exposure);
+        ppfxShader.setFloat("bloom", bloom);
+        ppo.draw_texture_to_screen();
+        
+        //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        //screenShader.use();
+        //ssaoBlurBuffer.activate(screenShader, "screenTexture", 0);
+        //screen.Draw();
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Terminate
+    ppo.Delete();
+    GBuffer.Delete();
+    cube.Delete();
+    screen.Delete();
+    ssaoFBO.Delete();
+    glfwTerminate();
+    return 0;
+}
+
 int main(void)
 {
-    switch (17)
+    switch (18)
     {
     case 0:  return base_scene(); break;
     case 1:  return main_scene(); break;
@@ -3804,6 +4096,7 @@ int main(void)
     case 15: return hdr_scene(); break;
     case 16: return bloom_scene(); break;
     case 17: return deferred_scene(); break;
+    case 18: return ssao_scene(); break;
     }
 }
 
@@ -3917,4 +4210,9 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
     camera.ProcessMouseScroll(static_cast<float>(yoffset));
+}
+
+
+float lerp(float a, float b, float f) {
+    return a + (b - a) * f;
 }
