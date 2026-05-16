@@ -47,6 +47,10 @@ float heightScale = 0.0f;
 float exposure = 1.0f;
 bool bloom = false;
 bool bloom_key = false;
+bool ssaoFlag = false;
+bool ssao_key = false;
+bool switchFlag = false;
+bool switch_key = false;
 
 // camera
 //Camera camera(glm::vec3(1.0f, 1.5f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -100, -20);
@@ -3858,8 +3862,8 @@ int ssao_scene() {
     // Vertices
 
     // Shaders
-    Shader geometryPassShader("../../../src/shaders/vertex_viewspace.vert", "../../../src/shaders/deferred_geometry_pass.frag");
-    Shader lightingPassShader("../../../src/shaders/screen.vert", "../../../src/shaders/deferred_lighting_pass_viewspace.frag");
+    Shader geometryPassShader("../../../src/shaders/vertex_invertable.vert", "../../../src/shaders/deferred_geometry_pass.frag");
+    Shader lightingPassShader("../../../src/shaders/screen.vert", "../../../src/shaders/deferred_lighting_pass.frag");
     Shader ssaoShader("../../../src/shaders/screen.vert", "../../../src/shaders/ssao.frag");
     Shader ssaoBlurShader("../../../src/shaders/screen.vert", "../../../src/shaders/ssaoBlur.frag");
     Shader ppfxShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
@@ -3905,34 +3909,77 @@ int ssao_scene() {
     // By sampling a cube and reshaping to a sphere there is oversampling near the corners of the original cube. 
     // Instead, use rejeciton sampling, or sample phi/theta/rho in correct proportions. 
     int ssaoKernelSize = 64;
-    std::uniform_real_distribution<float> randomFloats(0.0, 1.0);
     std::default_random_engine generator;
+    std::normal_distribution<float> normalFloats(0.0, 1.0);
+    std::uniform_real_distribution<float> uniformFloats(0.0, 1.0);
+
     std::vector<glm::vec3> ssaoKernel;
     for (unsigned int i = 0; i < ssaoKernelSize; ++i)
     {
+        float r = std::sqrt(uniformFloats(generator));    // sqrt for uniform disk sampling
+        float phi = 2.0f * glm::pi<float>() * uniformFloats(generator);
         glm::vec3 sample(
-            randomFloats(generator) * 2.0 - 1.0,
-            randomFloats(generator) * 2.0 - 1.0,
-            randomFloats(generator));
-        sample = glm::normalize(sample);
-        sample *= randomFloats(generator); 
-        float scale = (float)i / 64.0;
+            r* std::cos(phi),
+            r* std::sin(phi),
+            std::sqrt(1.0f - r * r));   // z = sqrt(1 - x^2 - y^2), always positive
+        sample *= uniformFloats(generator);
+        float scale = (float)i / ssaoKernelSize;
         scale = lerp(0.1f, 1.0f, scale * scale);
         sample *= scale;
         ssaoKernel.push_back(sample);
     }
 
+    std::vector<glm::vec3> ssaoOldKernel;
+    for (unsigned int i = 0; i < ssaoKernelSize; ++i)
+    {
+        glm::vec3 sample(
+            normalFloats(generator),
+            normalFloats(generator),
+            std::abs(normalFloats(generator)));
+        sample = glm::normalize(sample);
+        sample *= uniformFloats(generator);
+        float scale = (float)i / ssaoKernelSize;
+        scale = lerp(0.1f, 1.0f, scale * scale);
+        sample *= scale;
+        ssaoOldKernel.push_back(sample);
+    }
+
+    std::vector<glm::vec3> ssaoBadKernel;
+    for (unsigned int i = 0; i < ssaoKernelSize; ++i)
+    {
+        glm::vec3 sample(
+            uniformFloats(generator) * 2.0 - 1.0,
+            uniformFloats(generator) * 2.0 - 1.0,
+            uniformFloats(generator));
+        sample = glm::normalize(sample);
+        sample *= uniformFloats(generator); 
+        float scale = (float)i / ssaoKernelSize;
+        scale = lerp(0.1f, 1.0f, scale * scale);
+        sample *= scale;
+        ssaoBadKernel.push_back(sample);
+    }
+
     int ssaoNoiseSize = 4;
     std::vector<glm::vec3> ssaoNoise;
-    for (unsigned int i = 0; i < 16; i++) {
+    for (unsigned int i = 0; i < ssaoNoiseSize * ssaoNoiseSize; i++) {
         glm::vec3 noise(
-            randomFloats(generator) * 2.0 - 1.0,
-            randomFloats(generator) * 2.0 - 1.0,
+            normalFloats(generator),
+            normalFloats(generator),
             0.0);
-        ssaoNoise.push_back(noise);
+        ssaoNoise.push_back(glm::normalize(noise));
+    }
+
+    std::vector<glm::vec3> ssaoBadNoise;
+    for (unsigned int i = 0; i < ssaoNoiseSize * ssaoNoiseSize; i++) {
+        glm::vec3 noise(
+            uniformFloats(generator) * 2.0 - 1.0,
+            uniformFloats(generator) * 2.0 - 1.0,
+            0.0);
+        ssaoBadNoise.push_back(noise);
     }
 
     Texture ssaoNoiseTexture = Texture(ssaoNoiseSize, ssaoNoiseSize, GL_RGB16F, &ssaoNoise, GL_NEAREST, GL_NEAREST, GL_REPEAT, GL_REPEAT);
+    Texture ssaoBadNoiseTexture = Texture(ssaoNoiseSize, ssaoNoiseSize, GL_RGB16F, &ssaoBadNoise, GL_NEAREST, GL_NEAREST, GL_REPEAT, GL_REPEAT);
 
     auto vec3ToString = [](const glm::vec3& v) -> std::string {
         return "(" + std::to_string(v.x) + ", "
@@ -4003,14 +4050,17 @@ int ssao_scene() {
         GBuffer.positionGbuffer.activate(ssaoShader, "gPosition", 0);
         GBuffer.normalGbuffer.activate(ssaoShader, "gNormal", 1);
         GBuffer.albedoSpecGBuffer.activate(ssaoShader, "gAlbedoSpec", 2);
-        ssaoNoiseTexture.activate(ssaoShader, "ssaoNoise", 3);
+        switchFlag ? ssaoNoiseTexture.activate(ssaoShader, "ssaoNoise", 3): ssaoBadNoiseTexture.activate(ssaoShader, "ssaoNoise", 3);
         ssaoShader.setMat4("projection", projection);
-        for (unsigned int i = 0; i < ssaoKernel.size(); i++) {
-            ssaoShader.setVec3("samples[" + std::to_string(i) + "]", ssaoKernel[i]);
+        ssaoShader.setMat4("view", view);
+        for (unsigned int i = 0; i < ssaoKernelSize; i++) {
+            ssaoShader.setVec3("samples[" + std::to_string(i) + "]", switchFlag ? ssaoKernel[i]: ssaoBadKernel[i]);
         }
+        std::string message = switchFlag ? "good kernel" : "bad kernel";
+        std::cout << message << std::endl;
         ssaoShader.setInt("kernelSize", ssaoKernelSize);
         ssaoShader.setFloat("radius", 0.5);
-        ssaoShader.setFloat("bias", 0.025);
+        ssaoShader.setFloat("bias", 0.05);
         ssaoShader.setFloat("occlusionStrength", 1.0);
         screen.Draw();
         ssaoFBO.unbind();
@@ -4036,7 +4086,7 @@ int ssao_scene() {
             lightingPassShader.setFloat("lights[" + std::to_string(i) + "].attenuation", gamma_correct ? 2.0 : 1.0);
         }
         ssaoBlurBuffer.activate(lightingPassShader, "ssaoColorBuffer", 3);
-        lightingPassShader.setBool("ssao", true);
+        lightingPassShader.setBool("ssaoFlag", ssaoFlag);
         //calculate lighting
         GBuffer.lighting_pass(ppo.renderBuffer.id);
 
@@ -4055,10 +4105,10 @@ int ssao_scene() {
         ppfxShader.setFloat("bloom", bloom);
         ppo.draw_texture_to_screen();
         
-        //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        //screenShader.use();
-        //ssaoBlurBuffer.activate(screenShader, "screenTexture", 0);
-        //screen.Draw();
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        screenShader.use();
+        ssaoBlurBuffer.activate(screenShader, "screenTexture", 0);
+        screen.Draw();
 
         // Swap buffers and poll for IO events
         glfwSwapBuffers(window);
@@ -4070,6 +4120,231 @@ int ssao_scene() {
     cube.Delete();
     screen.Delete();
     ssaoFBO.Delete();
+    glfwTerminate();
+    return 0;
+}
+
+int kernel_test_scene() {
+    // Variable setup
+    const unsigned int MS_SAMPLES = 1;
+    float gamma = 2.2;      // best to use 2.2
+    bool manual_gamma = true;
+    bool gamma_correct = (gamma == 2.2);
+
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, MS_SAMPLES);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+    int fbWidth, fbHeight;
+    glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+    std::cout << "SCR: " << SCR_WIDTH << "x" << SCR_HEIGHT << std::endl;
+    std::cout << "Framebuffer: " << fbWidth << "x" << fbHeight << std::endl;
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+
+    // OGL state setup --------------------------------------------------
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    //glEnable(GL_BLEND);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    if (MS_SAMPLES > 1) glEnable(GL_MULTISAMPLE);
+
+    if (gamma_correct && !manual_gamma) glEnable(GL_FRAMEBUFFER_SRGB);
+
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+
+    // Setup geometry, textures, buffers and shaders --------------------
+    // Vertices
+
+    // Shaders
+    Shader ourShader("../../../src/shaders/kernel_visualiser.vert", "../../../src/shaders/solid.frag");
+    Shader floorShader("../../../src/shaders/vertex.vert", "../../../src/shaders/solid.frag");
+
+    // Load textures
+
+    // Models & meshes
+    std::vector<TextureData> empty;
+    Model floor = Model(Quad(glm::vec2(2.0), 1.0, empty));
+
+    // Lights
+
+    // Render object setup
+
+    // shader setup
+
+    // SSAO setup
+    // These samples are not properly distributed. 
+    // By sampling a cube and reshaping to a sphere there is oversampling near the corners of the original cube. 
+    // Instead, use rejeciton sampling, or sample phi/theta/rho in correct proportions. 
+    const int ssaoKernelSize = 512;
+    std::vector<glm::vec3> ssaoKernel;
+    std::default_random_engine generator;
+    std::normal_distribution<float> normalFloats(0.0, 1.0);
+    std::uniform_real_distribution<float> uniformFloats(0.0, 1.0);
+    for (unsigned int i = 0; i < ssaoKernelSize; ++i)
+    {
+        glm::vec3 sample(
+            normalFloats(generator),
+            normalFloats(generator),
+            std::abs(normalFloats(generator)));
+        sample = glm::normalize(sample);
+        sample *= uniformFloats(generator);
+        float scale = (float)i / ssaoKernelSize;
+        scale = lerp(0.1f, 1.0f, scale * scale);
+        sample *= scale;
+        ssaoKernel.push_back(glm::vec3(0.0));
+        ssaoKernel.push_back(sample);
+    }
+
+    std::vector<glm::vec3> ssaoBadKernel;
+    for (unsigned int i = 0; i < ssaoKernelSize; ++i)
+    {
+        glm::vec3 sample(
+            uniformFloats(generator) * 2.0 - 1.0,
+            uniformFloats(generator) * 2.0 - 1.0,
+            uniformFloats(generator));
+        sample = glm::normalize(sample);
+        sample *= uniformFloats(generator);
+        float scale = (float)i / ssaoKernelSize;
+        scale = lerp(0.1f, 1.0f, scale * scale);
+        sample *= scale;
+        ssaoBadKernel.push_back(glm::vec3(0.0));
+        ssaoBadKernel.push_back(sample);
+    }
+
+    int ssaoNoiseSize = 4;
+    std::vector<glm::vec3> ssaoNoise;
+    for (unsigned int i = 0; i < 16; i++) {
+        glm::vec3 noise(
+            uniformFloats(generator) * 2.0 - 1.0,
+            uniformFloats(generator) * 2.0 - 1.0,
+            0.0);
+        ssaoNoise.push_back(noise);
+    }
+
+    std::vector<glm::vec3> ssaoBadNoise;
+    for (unsigned int i = 0; i < 16; i++) {
+        glm::vec3 noise(
+            uniformFloats(generator) * 2.0 - 1.0,
+            uniformFloats(generator) * 2.0 - 1.0,
+            0.0);
+        ssaoBadNoise.push_back(noise);
+    }
+
+    Texture ssaoNoiseTexture = Texture(ssaoNoiseSize, ssaoNoiseSize, GL_RGB16F, &ssaoNoise, GL_NEAREST, GL_NEAREST, GL_REPEAT, GL_REPEAT);
+
+    auto vec3ToString = [](const glm::vec3& v) -> std::string {
+        return "(" + std::to_string(v.x) + ", "
+            + std::to_string(v.y) + ", "
+            + std::to_string(v.z) + ")";
+        };
+
+    VAO vaoGood = VAO();
+    VBO vboGood = VBO(ssaoKernel);
+    vaoGood.bind();
+    vaoGood.linkVBO(vboGood);
+    vaoGood.setAttributes(3, 0, 0, 0);
+    vaoGood.unbind();
+
+    VAO vaoBad = VAO();
+    VBO vboBad = VBO(ssaoBadKernel);
+    vaoBad.bind();
+    vaoBad.linkVBO(vboBad);
+    vaoBad.setAttributes(3, 0, 0, 0);
+    vaoBad.unbind();
+
+
+
+    // Background
+    //float clear_color[] = { pow(0.1, gamma), pow(0.1, gamma), pow(0.1, gamma), 1.0 };
+    float clear_color[] = { 0.0, 0.5, 0.5, 1.0 };
+
+
+    // Main render loop ---------------------------------------------------
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClearBufferfv(GL_COLOR, 0, clear_color);
+
+        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
+
+        ourShader.use();
+        ourShader.setVec3("color", glm::vec3(1.0, 0.0, 0.0));
+        ourShader.setMat4("view", view);
+        ourShader.setMat4("projection", projection);
+        ourShader.setMat4("model", model);
+        switchFlag ? vaoGood.bind(): vaoBad.bind();
+        std::string message = switchFlag ? "good kernel" : "bad kernel";
+        std::cout << message << std::endl;
+        glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(ssaoKernel.size()));
+
+        floorShader.use();
+        floorShader.setVec3("color", glm::vec3(0.3, 0.3, 0.3));
+        floorShader.setMat4("view", view);
+        floorShader.setMat4("projection", projection);
+        floorShader.setMat4("model", model);
+        floor.Draw(floorShader);
+
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Terminate
     glfwTerminate();
     return 0;
 }
@@ -4097,6 +4372,7 @@ int main(void)
     case 16: return bloom_scene(); break;
     case 17: return deferred_scene(); break;
     case 18: return ssao_scene(); break;
+    case 19: return kernel_test_scene(); break;
     }
 }
 
@@ -4144,6 +4420,22 @@ void processInput(GLFWwindow* window)
     }
     if (glfwGetKey(window, GLFW_KEY_B) == GLFW_RELEASE) {
         bloom_key = false;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS && !ssao_key) {
+        ssaoFlag = !ssaoFlag;
+        ssao_key = true;
+    }
+    if (glfwGetKey(window, GLFW_KEY_O) == GLFW_RELEASE) {
+        ssao_key = false;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !switch_key) {
+        switchFlag = !switchFlag;
+        switch_key = true;
+    }
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_RELEASE) {
+        switch_key = false;
     }
 
     if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
@@ -4211,7 +4503,6 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
     camera.ProcessMouseScroll(static_cast<float>(yoffset));
 }
-
 
 float lerp(float a, float b, float f) {
     return a + (b - a) * f;

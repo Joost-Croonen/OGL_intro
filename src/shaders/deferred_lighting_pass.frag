@@ -17,7 +17,7 @@ struct light {
 const int NR_LIGHTS = 32;
 uniform light lights[NR_LIGHTS];
 uniform vec3 viewPos;
-bool ssao;
+uniform bool ssaoFlag;
 
 void main()	
 {
@@ -27,11 +27,12 @@ void main()
 	vec3 Albedo = texture(gAlbedoSpec, TexCoords).rgb;
 	float Specular = texture(gAlbedoSpec, TexCoords).a;
 	float ambient_occlusion = 1;
-	if (ssao) ambient_occlusion = texture(ssaoColorBuffer, TexCoords).r;
+	if (ssaoFlag) ambient_occlusion = texture(ssaoColorBuffer, TexCoords).r;
 	// lighting
 	vec3 norm = normalize(Normal);
 	vec3 viewDir = normalize(viewPos - FragPos);
-	vec3 lighting = Albedo * ambient_occlusion * 0.01;		// crappy ambient light
+	float ambientSky = dot(norm + vec3(0.0, 1.0, 0.0), vec3(0.0, 1.0, 0.0))/2.0;   // to give some upward direciton to the ambient light
+	vec3 lighting = Albedo * ambient_occlusion * 0.1 * ambientSky;
 	for(int i = 0; i < NR_LIGHTS; ++i)
 	{
 		// attentunation

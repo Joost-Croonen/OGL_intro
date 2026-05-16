@@ -17,7 +17,7 @@ struct light {
 const int NR_LIGHTS = 32;
 uniform light lights[NR_LIGHTS];
 uniform vec3 viewPos;
-bool ssao;
+uniform bool ssaoFlag;
 
 void main()	
 {
@@ -26,7 +26,8 @@ void main()
 	vec3 Normal = texture(gNormal, TexCoords).rgb;				//view
 	vec3 Albedo = texture(gAlbedoSpec, TexCoords).rgb;			
 	float Specular = texture(gAlbedoSpec, TexCoords).a;
-	float ambient_occlusion = texture(ssaoColorBuffer, TexCoords).r;
+	float ambient_occlusion = 1.0;
+	if(ssaoFlag) ambient_occlusion = texture(ssaoColorBuffer, TexCoords).r;
 	// lighting
 	vec3 norm = normalize(Normal);								//view
 	vec3 viewDir = normalize(- FragPos);						//view  !viewPos = (0,0,0)!
