@@ -43,6 +43,8 @@ public:
 		catch(std::ifstream::failure e)
 		{
 			std::cout << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ" << std::endl;
+			std::cout << "  vertex: " << vertexPath << std::endl;
+			std::cout << "  fragment: " << fragmentPath << std::endl;
 		}
 		// convert to const char
 		const char* vShaderCode = vertexCode.c_str();
@@ -110,6 +112,9 @@ public:
 		catch (std::ifstream::failure e)
 		{
 			std::cout << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ" << std::endl;
+			std::cout << "  vertex: " << vertexPath << std::endl;
+			std::cout << "  geometry: " << geometryPath << std::endl;
+			std::cout << "  fragment: " << fragmentPath << std::endl;
 		}
 		// convert to const char
 		const char* vShaderCode = vertexCode.c_str();

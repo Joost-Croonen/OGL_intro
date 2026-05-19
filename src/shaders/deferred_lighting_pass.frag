@@ -31,8 +31,8 @@ void main()
 	// lighting
 	vec3 norm = normalize(Normal);
 	vec3 viewDir = normalize(viewPos - FragPos);
-	float ambientSky = dot(norm + vec3(0.0, 1.0, 0.0), vec3(0.0, 1.0, 0.0))/2.0;   // to give some upward direciton to the ambient light
-	vec3 lighting = Albedo * ambient_occlusion * 0.1 * ambientSky;
+	//float ambientSky = dot(norm + vec3(0.0, 1.0, 0.0), vec3(0.0, 1.0, 0.0))/2.0;   // to give some upward direciton to the ambient light
+	vec3 lighting = Albedo * ambient_occlusion * 0.1; // * ambientSky;
 	for(int i = 0; i < NR_LIGHTS; ++i)
 	{
 		// attentunation

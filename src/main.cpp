@@ -3652,7 +3652,7 @@ int deferred_scene() {
     // Models & meshes
     Model cube = Model(Cube(glm::vec3(2.0), 1.0, std::vector<TextureData>{}));
     ScreenQuad screen = ScreenQuad();
-    Model backpack("../../../src/models/backpack/backpack.obj");
+    Model backpack("../../../src/models/backpack/backpack.obj", gamma_correct);
     std::vector<glm::vec3> objectPositions;
     objectPositions.push_back(glm::vec3(-3.0, -0.5, -3.0));
     objectPositions.push_back(glm::vec3(0.0, -0.5, -3.0));
@@ -3876,7 +3876,7 @@ int ssao_scene() {
     // Models & meshes
     Model cube = Model(Cube(glm::vec3(2.0), 1.0, std::vector<TextureData>{woodData}));
     ScreenQuad screen = ScreenQuad();
-    Model backpack("../../../src/models/backpack/backpack.obj");
+    Model backpack("../../../src/models/backpack/backpack.obj", gamma_correct);
 
     // Lights
     const unsigned int NR_LIGHTS = 32;
@@ -4105,10 +4105,10 @@ int ssao_scene() {
         ppfxShader.setFloat("bloom", bloom);
         ppo.draw_texture_to_screen();
         
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        screenShader.use();
-        ssaoBlurBuffer.activate(screenShader, "screenTexture", 0);
-        screen.Draw();
+        //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        //screenShader.use();
+        //ssaoBlurBuffer.activate(screenShader, "screenTexture", 0);
+        //screen.Draw();
 
         // Swap buffers and poll for IO events
         glfwSwapBuffers(window);
@@ -4349,9 +4349,181 @@ int kernel_test_scene() {
     return 0;
 }
 
+int pbr_scene() {
+    // Variable setup
+    const unsigned int MS_SAMPLES = 1;
+    float gamma = 2.2;      // best to use 2.2
+    bool manual_gamma = true;
+    bool gamma_correct = (gamma == 2.2);
+
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, MS_SAMPLES);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+    int fbWidth, fbHeight;
+    glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+    std::cout << "SCR: " << SCR_WIDTH << "x" << SCR_HEIGHT << std::endl;
+    std::cout << "Framebuffer: " << fbWidth << "x" << fbHeight << std::endl;
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+
+    // OGL state setup --------------------------------------------------
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    //glEnable(GL_BLEND);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    if (MS_SAMPLES > 1) glEnable(GL_MULTISAMPLE);
+
+    if (gamma_correct && !manual_gamma) glEnable(GL_FRAMEBUFFER_SRGB);
+
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+
+    // Setup geometry, textures, buffers and shaders --------------------
+    // Vertices
+
+    // Shaders
+    Shader pbrShader("../../../src/shaders/vertex_advanced.vert", "../../../src/shaders/pbr_test.frag");
+
+    // Load textures
+
+    // Models & meshes
+    Model sphere = Model("../../../src/models/sphere/sphere.obj", gamma_correct);
+
+    // Model transformations
+    int nrRows = 4;
+    int nrColumns = 4;
+    float spacing = 2.5;
+
+    // Lights
+    glm::vec3 lightPositions[] = {
+        glm::vec3(-10.0f,  10.0f, 10.0f),
+        glm::vec3(10.0f,  10.0f, 10.0f),
+        glm::vec3(-10.0f, -10.0f, 10.0f),
+        glm::vec3(10.0f, -10.0f, 10.0f),
+    };
+    glm::vec3 lightColors[] = {
+        glm::vec3(300.0f, 300.0f, 300.0f),
+        glm::vec3(300.0f, 300.0f, 300.0f),
+        glm::vec3(300.0f, 300.0f, 300.0f),
+        glm::vec3(300.0f, 300.0f, 300.0f)
+    };
+
+    // Render object setup
+
+    // shader setup
+    
+    // Background
+    float clear_color[] = { pow(0.1, gamma), pow(0.1, gamma), pow(0.1, gamma), 1.0 };
+
+    // Main render loop ---------------------------------------------------
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClearBufferfv(GL_COLOR, 0, clear_color);
+
+        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
+
+        pbrShader.use();
+        pbrShader.setMat4("view", view);
+        pbrShader.setMat4("projection", projection);
+        pbrShader.setInt("numLights", sizeof(lightPositions) / sizeof(lightPositions[0]));
+        for (unsigned int i = 0; i < sizeof(lightPositions) / sizeof(lightPositions[0]); ++i)
+        {
+            pbrShader.setVec3("lights[" + std::to_string(i) + "].position", lightPositions[i]);
+            pbrShader.setVec3("lights[" + std::to_string(i) + "].color", lightColors[i]);
+        }
+        pbrShader.setVec3("camPos", camera.Position);
+        pbrShader.setVec3("albedo", 0.5f, 0.0f, 0.0f);
+        pbrShader.setFloat("occlusion", 1.0f);
+        for (int row = 0; row < nrRows; ++row)
+        {
+            pbrShader.setFloat("metalness", (float)row / (float)(nrRows - 1));
+            //pbrShader.setFloat("metalness", 1.0);
+            for (int col = 0; col < nrColumns; ++col)
+            {
+                // we clamp the roughness to 0.05 - 1.0 as perfectly smooth surfaces (roughness of 0.0) tend to look a bit off
+                // on direct lighting.
+                pbrShader.setFloat("roughness", glm::clamp((float)col / (float)(nrColumns - 1), 0.05f, 1.0f));
+
+                model = glm::mat4(1.0f);
+                model = glm::translate(model, glm::vec3(
+                    (col - (nrColumns / 2)) * spacing,
+                    (row - (nrRows / 2)) * spacing,
+                    0.0f
+                ));
+                pbrShader.setMat4("model", model);
+                pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
+                sphere.Draw(pbrShader);
+            }
+        }
+
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Terminate
+    glfwTerminate();
+    return 0;
+}
+
 int main(void)
 {
-    switch (18)
+    switch (20)
     {
     case 0:  return base_scene(); break;
     case 1:  return main_scene(); break;
@@ -4373,6 +4545,7 @@ int main(void)
     case 17: return deferred_scene(); break;
     case 18: return ssao_scene(); break;
     case 19: return kernel_test_scene(); break;
+    case 20: return pbr_scene(); break;
     }
 }
 
