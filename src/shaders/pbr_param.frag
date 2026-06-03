@@ -45,11 +45,8 @@ float GeometrySchlickGGX(float NdotV, float k)
 	return num / denom;
 }
 
-float GemoetrySmith(vec3 N, vec3 V, vec3 L, float roughness)
+float GeometrySmith(float NdotL, float NdotV, float roughness)
 {	
-	float NdotL = max(dot(N, L), 0.0);
-	float NdotV = max(dot(N, V), 0.0);
-
 	float r = roughness + 1.0;
 	float k = (r*r) / 8.0;
 
@@ -69,7 +66,7 @@ void main()
 	vec3 test = vec3(0.0);
 
 	vec3 N = normalize(Normal);
-	vec3 V = camPos - WorldPos;
+	vec3 V = normalize(camPos - WorldPos);
 
 	vec3 Lo = vec3(0.0);
 	for (int i=0; i<numLights; i++)
@@ -89,7 +86,7 @@ void main()
 		vec3 F = fresnelSchlick(HdotV, F0);
 
 		float D = DistributionGGX(N, H, roughness);
-		float G = GemoetrySmith(N, V, L, roughness);
+		float G = GeometrySmith(NdotL, NdotV, roughness);
 
 		vec3 num = D * G * F;
 		float denom = 4 * NdotV * NdotL + 0.0001;

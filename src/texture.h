@@ -39,7 +39,7 @@ unsigned int TextureFromFile(const char* path, const std::string &dir, bool gamm
         }
         else if (nrChannels == 4) {
             format = GL_RGBA;
-            internalFormat = gamma_correct ? GL_SRGB_ALPHA: GL_RGBA;
+            internalFormat = gamma_correct ? GL_SRGB_ALPHA : GL_RGBA;
         }
         glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
@@ -66,12 +66,12 @@ public:
 
     //Texture() {};
 
-    Texture(const char* path, 
+    Texture(const char* path,
         bool gamma_correct = false, bool flipY = true, bool inverted = false,
         GLint wrap_s = GL_REPEAT, GLint wrap_t = GL_REPEAT,
         GLint min_filt = GL_LINEAR_MIPMAP_LINEAR, GLint mag_filt = GL_LINEAR) :
         albedoPath(path), samples(1)
-	{
+    {
         // Set image orientation
         stbi_set_flip_vertically_on_load(flipY);
         // Generate and bind
@@ -113,7 +113,7 @@ public:
         // Memory cleanup
         stbi_image_free(data);
         glActiveTexture(GL_TEXTURE0);
-	}
+    }
 
     Texture(unsigned int width, unsigned int height, GLenum internalFormat, std::vector<glm::vec3> *data,
         GLint min_filt = GL_LINEAR, GLint mag_filt = GL_LINEAR, 
@@ -310,24 +310,30 @@ public:
         float borderColor[4] = DEFAULT_BORDER_COLOR) :
         paths(std::vector<std::string>{}), width(width), height(height), nrChannels(1)
     {
-        GLenum dataFormat;
-        GLenum pixelType;
+        GLenum format;
+        GLenum dataType;
         if (internalFormat == GL_DEPTH_COMPONENT)
         {
-            dataFormat = GL_DEPTH_COMPONENT;
+            format = GL_DEPTH_COMPONENT;
             nrChannels = 1;
-            pixelType = GL_FLOAT;
+            dataType = GL_FLOAT;
+        }
+        else if (internalFormat == GL_RGB16F)
+        {
+            format = GL_RGB;
+            nrChannels = 3;
+            dataType = GL_FLOAT;
         }
         else {
-            dataFormat = GL_RGB;
+            format = GL_RGB;
             nrChannels = 3;
-            pixelType = GL_UNSIGNED_BYTE;
+            dataType = GL_UNSIGNED_BYTE;
         }
         glGenTextures(1, &id);
         glBindTexture(GL_TEXTURE_CUBE_MAP, id);
         for (unsigned int i=0; i<6; ++i)
         {
-            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, internalFormat, this->width, this->height, 0, dataFormat, pixelType, NULL);
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, internalFormat, this->width, this->height, 0, format, dataType, NULL);
         }
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, min_filt);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, mag_filt);
@@ -347,14 +353,109 @@ public:
         glBindTexture(GL_TEXTURE_CUBE_MAP, id);
     }
 
-    void attach(GLenum attachement) const
+    void attachAll(GLenum attachement) const
     {
         glFramebufferTexture(GL_FRAMEBUFFER, attachement, id, 0);
+    }
+
+    void attachFace(GLenum attachement, unsigned int face) const
+    {
+        glFramebufferTexture2D(GL_FRAMEBUFFER, attachement, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, id, 0);
     }
 
 private:
     int width, height, nrChannels;
     std::vector<std::string> paths;
+};
+
+
+
+class HDR
+{
+public:
+    unsigned int id;
+
+    HDR() {}
+
+    HDR(const char* path) :path(path)
+    {
+        // Set image orientation
+        stbi_set_flip_vertically_on_load(true);
+        // Generate and bind
+        glGenTextures(1, &id);
+        glBindTexture(GL_TEXTURE_2D, id);
+        // Define texture parameters
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        // Load image
+        float* data = stbi_loadf(path, &width, &height, &nrChannels, 0);
+        // Create texture and generate mipmaps for currently bound texture
+        if (data) {
+            GLenum format;
+            GLenum internalFormat;
+            GLenum dataType = GL_FLOAT;
+            if (nrChannels == 1) {
+                format = GL_RED;
+                internalFormat = GL_R16F;
+            }
+            else if (nrChannels == 3) {
+                format = GL_RGB;
+                internalFormat = GL_RGB16F;
+            }
+            else if (nrChannels == 4) {
+                format = GL_RGBA;
+                internalFormat = GL_RGBA16F;
+            }
+            glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, dataType, data);
+            glGenerateMipmap(GL_TEXTURE_2D);
+        }
+        else {
+            std::cout << "Failed to load image texture" << std::endl;
+        }
+        // Memory cleanup
+        stbi_image_free(data);
+        glActiveTexture(GL_TEXTURE0);
+    }
+
+    void activate(Shader shader, const char* name, unsigned int texture_unit) const
+    {
+        shader.use();
+        glActiveTexture(GL_TEXTURE0 + texture_unit);
+        shader.setInt(name, texture_unit);
+        glBindTexture(GL_TEXTURE_2D, id);
+    }
+
+private:
+    int width, height, nrChannels;
+    std::string path;
+};
+
+
+class Material
+{
+private:
+    std::string albedoPath;
+    std::string normalPath;
+    std::string ormPath;
+public:
+    Texture albedo;
+    Texture normal;
+    Texture orm;
+    Material(const char* path, bool gamma_correct) :
+        albedoPath(std::string(path) + "/albedo.png"),
+        normalPath(std::string(path) + "/normal.png"),
+        ormPath(std::string(path) + "/ORM.png"),
+        albedo(Texture(albedoPath.c_str(), gamma_correct)),
+        normal(Texture(normalPath.c_str(), false)),
+        orm(Texture(ormPath.c_str(), false))
+    {
+        //std::cout << path << std::endl;
+        //std::cout << albedoPath << std::endl;
+        //std::cout << normalPath << std::endl;
+        //std::cout << ormPath << std::endl;
+    }
 };
 
 #endif

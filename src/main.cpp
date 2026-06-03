@@ -49,8 +49,8 @@ bool bloom = false;
 bool bloom_key = false;
 bool ssaoFlag = false;
 bool ssao_key = false;
-bool switchFlag = false;
-bool switch_key = false;
+bool toggle = false;
+bool toggle_key = false;
 
 // camera
 //Camera camera(glm::vec3(1.0f, 1.5f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -100, -20);
@@ -2164,6 +2164,7 @@ int gamma_scene() {
         glDisable(GL_DEPTH_TEST);
         
         screenShader.use();
+        screenShader.setFloat("exposure", exposure);
         screenBufferTexture.activate(screenShader, "screenTexture", 0);
         screenVAO.bind();
         glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -2663,7 +2664,7 @@ int point_shadow_scene() {
     FBO shadowFBO = FBO();
     Cubemap shadowCubeMap = Cubemap(SHADOW_WIDTH, SHADOW_HEIGHT, GL_DEPTH_COMPONENT);
     shadowFBO.bind();
-    shadowCubeMap.attach(GL_DEPTH_ATTACHMENT);
+    shadowCubeMap.attachAll(GL_DEPTH_ATTACHMENT);
     shadowFBO.set_draw_buffer(GL_NONE);
     shadowFBO.set_read_buffer(GL_NONE);
     shadowFBO.unbind();
@@ -3337,7 +3338,7 @@ int bloom_scene() {
     const unsigned int MS_SAMPLES = 1;
     float gamma = 2.2;
     bool manual_gamma = true;
-    bool gamma_correct = (gamma != 1.0);
+    bool gamma_correct = abs(gamma - 2.2) < 0.01;
 
     // Initialse GLFW
     glfwInit();
@@ -3571,7 +3572,7 @@ int deferred_scene() {
     const unsigned int MS_SAMPLES = 1;
     float gamma = 2.2;
     bool manual_gamma = true;
-    bool gamma_correct = (gamma != 1.0);
+    bool gamma_correct = abs(gamma - 2.2) < 0.01;
 
     // Initialse GLFW
     glfwInit();
@@ -3793,7 +3794,7 @@ int ssao_scene() {
     const unsigned int MS_SAMPLES = 1;
     float gamma = 2.2;      // best to use 2.2
     bool manual_gamma = true;
-    bool gamma_correct = (gamma == 2.2);
+    bool gamma_correct = abs(gamma - 2.2) < 0.01;
 
     // Initialse GLFW
     glfwInit();
@@ -4050,13 +4051,13 @@ int ssao_scene() {
         GBuffer.positionGbuffer.activate(ssaoShader, "gPosition", 0);
         GBuffer.normalGbuffer.activate(ssaoShader, "gNormal", 1);
         GBuffer.albedoSpecGBuffer.activate(ssaoShader, "gAlbedoSpec", 2);
-        switchFlag ? ssaoNoiseTexture.activate(ssaoShader, "ssaoNoise", 3): ssaoBadNoiseTexture.activate(ssaoShader, "ssaoNoise", 3);
+        toggle ? ssaoNoiseTexture.activate(ssaoShader, "ssaoNoise", 3): ssaoBadNoiseTexture.activate(ssaoShader, "ssaoNoise", 3);
         ssaoShader.setMat4("projection", projection);
         ssaoShader.setMat4("view", view);
         for (unsigned int i = 0; i < ssaoKernelSize; i++) {
-            ssaoShader.setVec3("samples[" + std::to_string(i) + "]", switchFlag ? ssaoKernel[i]: ssaoBadKernel[i]);
+            ssaoShader.setVec3("samples[" + std::to_string(i) + "]", toggle ? ssaoKernel[i]: ssaoBadKernel[i]);
         }
-        std::string message = switchFlag ? "good kernel" : "bad kernel";
+        std::string message = toggle ? "good kernel" : "bad kernel";
         std::cout << message << std::endl;
         ssaoShader.setInt("kernelSize", ssaoKernelSize);
         ssaoShader.setFloat("radius", 0.5);
@@ -4129,7 +4130,7 @@ int kernel_test_scene() {
     const unsigned int MS_SAMPLES = 1;
     float gamma = 2.2;      // best to use 2.2
     bool manual_gamma = true;
-    bool gamma_correct = (gamma == 2.2);
+    bool gamma_correct = abs(gamma - 2.2) < 0.01;
 
     // Initialse GLFW
     glfwInit();
@@ -4327,8 +4328,8 @@ int kernel_test_scene() {
         ourShader.setMat4("view", view);
         ourShader.setMat4("projection", projection);
         ourShader.setMat4("model", model);
-        switchFlag ? vaoGood.bind(): vaoBad.bind();
-        std::string message = switchFlag ? "good kernel" : "bad kernel";
+        toggle ? vaoGood.bind(): vaoBad.bind();
+        std::string message = toggle ? "good kernel" : "bad kernel";
         std::cout << message << std::endl;
         glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(ssaoKernel.size()));
 
@@ -4354,7 +4355,7 @@ int pbr_scene() {
     const unsigned int MS_SAMPLES = 1;
     float gamma = 2.2;      // best to use 2.2
     bool manual_gamma = true;
-    bool gamma_correct = (gamma == 2.2);
+    bool gamma_correct = abs(gamma - 2.2) < 0.01;
 
     // Initialse GLFW
     glfwInit();
@@ -4423,7 +4424,7 @@ int pbr_scene() {
     // Vertices
 
     // Shaders
-    Shader pbrShader("../../../src/shaders/vertex_advanced.vert", "../../../src/shaders/pbr_test.frag");
+    Shader pbrShader("../../../src/shaders/vertex_advanced.vert", "../../../src/shaders/pbr_param.frag");
 
     // Load textures
 
@@ -4521,9 +4522,523 @@ int pbr_scene() {
     return 0;
 }
 
+int pbr_texture_scene() {
+    // Variable setup
+    const unsigned int MS_SAMPLES = 1;
+    float gamma = 2.2;      // best to use 2.2
+    bool manual_gamma = true;
+    bool gamma_correct = abs(gamma - 2.2) < 0.01;
+
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, MS_SAMPLES);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+    int fbWidth, fbHeight;
+    glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+
+    // OGL state setup --------------------------------------------------
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    //glEnable(GL_BLEND);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    if (MS_SAMPLES > 1) glEnable(GL_MULTISAMPLE);
+
+    if (gamma_correct && !manual_gamma) glEnable(GL_FRAMEBUFFER_SRGB);
+
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+
+    // Setup geometry, textures, buffers and shaders --------------------
+    // Vertices
+
+    // Shaders
+    Shader pbrShader("../../../src/shaders/vertex_advanced.vert", "../../../src/shaders/pbr_text.frag");
+
+    // Load textures
+    Texture rustedIronAlbedo("../../../src/textures/rusted_iron/albedo.png", gamma_correct);
+    Texture rustedIronNormal("../../../src/textures/rusted_iron/normal.png", gamma_correct);
+    Texture rustedIronORM("../../../src/textures/rusted_iron/ORM.png", gamma_correct);
+
+    // Models & meshes
+    Model sphere = Model("../../../src/models/sphere/sphere.obj", gamma_correct);
+
+    // Model transformations
+    int nrRows = 4;
+    int nrColumns = 4;
+    float spacing = 2.5;
+
+    // Lights
+    glm::vec3 lightPositions[] = {
+        glm::vec3(-10.0f,  10.0f, 10.0f),
+        glm::vec3(10.0f,  10.0f, 10.0f),
+        glm::vec3(-10.0f, -10.0f, 10.0f),
+        glm::vec3(10.0f, -10.0f, 10.0f),
+    };
+    glm::vec3 lightColors[] = {
+        glm::vec3(300.0f, 300.0f, 300.0f),
+        glm::vec3(300.0f, 300.0f, 300.0f),
+        glm::vec3(300.0f, 300.0f, 300.0f),
+        glm::vec3(300.0f, 300.0f, 300.0f)
+    };
+
+    // Render object setup
+
+    // shader setup
+
+    // Background
+    float clear_color[] = { pow(0.1, gamma), pow(0.1, gamma), pow(0.1, gamma), 1.0 };
+
+    // Main render loop ---------------------------------------------------
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClearBufferfv(GL_COLOR, 0, clear_color);
+
+        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
+
+        pbrShader.use();
+        pbrShader.setMat4("view", view);
+        pbrShader.setMat4("projection", projection);
+        pbrShader.setInt("numLights", sizeof(lightPositions) / sizeof(lightPositions[0]));
+        for (unsigned int i = 0; i < sizeof(lightPositions) / sizeof(lightPositions[0]); ++i)
+        {
+            pbrShader.setVec3("lights[" + std::to_string(i) + "].position", lightPositions[i]);
+            pbrShader.setVec3("lights[" + std::to_string(i) + "].color", lightColors[i]);
+        }
+        pbrShader.setVec3("camPos", camera.Position);
+        rustedIronAlbedo.activate(pbrShader, "AlbedoMap", 0);
+        rustedIronNormal.activate(pbrShader, "NormalMap", 1);
+        rustedIronORM.activate(pbrShader, "ORMMap", 2);
+        for (int row = 0; row < nrRows; ++row)
+        {
+            //pbrShader.setFloat("metalness", 1.0);
+            for (int col = 0; col < nrColumns; ++col)
+            {
+                // we clamp the roughness to 0.05 - 1.0 as perfectly smooth surfaces (roughness of 0.0) tend to look a bit off
+                // on direct lighting.
+                pbrShader.setFloat("roughness", glm::clamp((float)col / (float)(nrColumns - 1), 0.05f, 1.0f));
+
+                model = glm::mat4(1.0f);
+                model = glm::translate(model, glm::vec3(
+                    (col - (nrColumns / 2)) * spacing,
+                    (row - (nrRows / 2)) * spacing,
+                    0.0f
+                ));
+                pbrShader.setMat4("model", model);
+                pbrShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
+                sphere.Draw(pbrShader);
+            }
+        }
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Terminate
+    glfwTerminate();
+    return 0;
+}
+
+int ibl_scene() {
+    // Variable setup
+    const unsigned int MS_SAMPLES = 1;
+    float gamma = 2.2;      // best to use 2.2
+    bool manual_gamma = true;
+    bool gamma_correct = abs(gamma - 2.2) < 0.01;
+
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, MS_SAMPLES);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+    int fbWidth, fbHeight;
+    glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+
+    // OGL state setup --------------------------------------------------
+    glEnable(GL_DEPTH_TEST); 
+    glDepthFunc(GL_LEQUAL);
+
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    //glEnable(GL_BLEND);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    if (MS_SAMPLES > 1) glEnable(GL_MULTISAMPLE);
+
+    if (gamma_correct && !manual_gamma) glEnable(GL_FRAMEBUFFER_SRGB);
+
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+
+    // Setup geometry, textures, buffers and shaders --------------------
+    // Vertices
+
+    // Shaders
+    Shader pbrManualShader("../../../src/shaders/vertex_advanced.vert", "../../../src/shaders/pbr_ibl_param.frag");
+    Shader pbrTextureShader("../../../src/shaders/vertex_advanced.vert", "../../../src/shaders/pbr_ibl_text.frag");
+    Shader lightShader("../../../src/shaders/vertex_advanced.vert", "../../../src/shaders/solid.frag");
+    Shader equirectToCubemapShader("../../../src/shaders/cube_project.vert", "../../../src/shaders/equirect.frag");
+    Shader radianceConvolutionShader("../../../src/shaders/cube_project.vert", "../../../src/shaders/radiance_convolution.frag");
+    Shader skyboxShader("../../../src/shaders/cubemap.vert", "../../../src/shaders/cubemap.frag");
+    Shader ppfxShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
+
+    // Load textures
+    Texture rustedIronAlbedo("../../../src/textures/rusted_iron/albedo.png", gamma_correct);
+    Texture rustedIronNormal("../../../src/textures/rusted_iron/normal.png", gamma_correct);
+    Texture rustedIronORM("../../../src/textures/rusted_iron/ORM.png", gamma_correct);
+
+    std::vector < std::string > cubemap_paths = {
+        "../../../src/textures/skybox/right.jpg",
+        "../../../src/textures/skybox/left.jpg",
+        "../../../src/textures/skybox/top.jpg",
+        "../../../src/textures/skybox/bottom.jpg",
+        "../../../src/textures/skybox/front.jpg",
+        "../../../src/textures/skybox/back.jpg"
+    };
+    Cubemap skybox(cubemap_paths);
+
+    HDR hdr = HDR("../../../src/textures/HDR/newport_loft.hdr");
+
+    Material rusted_metal = Material("../../../src/textures/rusted_iron", gamma_correct);
+    Material gold = Material("../../../src/textures/gold", gamma_correct);
+    Material grass = Material("../../../src/textures/grass", gamma_correct);
+    Material plastic = Material("../../../src/textures/plastic", gamma_correct);
+    Material wall = Material("../../../src/textures/wall", gamma_correct);
+
+    // Models & meshes
+    Model sphere = Model("../../../src/models/sphere/sphere.obj", gamma_correct);
+    Model cube = Model(Cube(glm::vec3(1.0), 1.0, std::vector<TextureData>{}));
+
+    // Model transformations
+    int nrRows = 7;
+    int nrColumns = 7;
+    float spacing = 2.5;
+
+    glm::vec3 spherePositions[] = {
+        glm::vec3(-5.0f,  0.0f, 0.0f),
+        glm::vec3(-2.5f,  0.0f, 0.0f),
+        glm::vec3(0.0f,  0.0f, 0.0f),
+        glm::vec3(2.5f,  0.0f, 0.0f),
+        glm::vec3(5.0f,  0.0f, 0.0f)
+    };
+    Material sphereMaterials[] = {
+        rusted_metal,
+        gold,
+        grass,
+        plastic,
+        wall
+    };
+
+    // Lights
+    glm::vec3 lightPositions[] = {
+        glm::vec3(-10.0f,  10.0f, 10.0),
+        glm::vec3(10.0f,  10.0f, 10.0f),
+        glm::vec3(-10.0f, -10.0f, 10.0f),
+        glm::vec3(10.0f, -10.0f, 10.0f),
+    };
+    glm::vec3 lightColors[] = {
+        glm::vec3(300.0f, 300.0f, 300.0f),
+        glm::vec3(0.0f, 0.0f, 0.0f),
+        glm::vec3(0.0f, 0.0f, 0.0f),
+        glm::vec3(0.0f, 0.0f, 0.0f)
+    };
+
+
+    // Render object setup
+    PPO ppo = PPO(ppfxShader, SCR_WIDTH, SCR_HEIGHT);
+    FBO captureFBO = FBO();
+    captureFBO.bind();
+    RBO captureRBO = RBO(512, 512, GL_DEPTH_COMPONENT24);
+    captureRBO.bind();
+    captureRBO.attach(GL_DEPTH_ATTACHMENT);
+    
+    // HDR cubemap setup
+    Cubemap hdrEnvCubemap = Cubemap(512, 512, GL_RGB16F, 1, GL_LINEAR, GL_LINEAR);
+    captureFBO.bind();
+    glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+    glm::mat4 captureViews[] = {
+           glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+           glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+           glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
+           glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
+           glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+           glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
+    };
+    equirectToCubemapShader.use();
+    hdr.activate(equirectToCubemapShader, "equirectangularMap", 0);
+    equirectToCubemapShader.setMat4("projection", captureProjection);
+    glViewport(0, 0, 512, 512);
+    glFrontFace(GL_CW);
+    for (unsigned int i = 0; i < 6; ++i)
+    {
+        equirectToCubemapShader.setMat4("view", captureViews[i]);
+        hdrEnvCubemap.attachFace(GL_COLOR_ATTACHMENT0, i);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        cube.Draw(equirectToCubemapShader);
+    }
+    glFrontFace(GL_CCW);
+    captureFBO.unbind();
+
+    // radiance convolution to irradiance cubemap
+    Cubemap irradianceCubemap = Cubemap(32, 32, GL_RGB16F, 1, GL_LINEAR, GL_LINEAR);
+    captureFBO.bind();
+    captureRBO.edit(32, 32, GL_DEPTH_COMPONENT24);
+    radianceConvolutionShader.use();
+    hdrEnvCubemap.activate(radianceConvolutionShader, "environmentMap", 0);
+    radianceConvolutionShader.setMat4("projection", captureProjection);
+    glViewport(0, 0, 32, 32);
+    glFrontFace(GL_CW);
+    for (unsigned int i = 0; i < 6; ++i)
+    {
+        radianceConvolutionShader.setMat4("view", captureViews[i]);
+        irradianceCubemap.attachFace(GL_COLOR_ATTACHMENT0, i);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        cube.Draw(radianceConvolutionShader);
+    }
+    glFrontFace(GL_CCW);
+    captureFBO.unbind();
+
+
+    // shader setup
+
+    // Background
+    float clear_color[] = { pow(0.1, gamma), pow(0.1, gamma), pow(0.1, gamma), 1.0 };
+
+
+    bool toggle_old = toggle;
+    int caseNr = 0;
+
+    // Main render loop ---------------------------------------------------
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+        ppo.start_render_to_texture();
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClearBufferfv(GL_COLOR, 0, clear_color);
+
+        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
+
+        pbrManualShader.use();
+        pbrManualShader.setMat4("view", view);
+        pbrManualShader.setMat4("projection", projection);
+        pbrManualShader.setInt("numLights", sizeof(lightPositions) / sizeof(lightPositions[0]));
+        for (unsigned int i = 0; i < sizeof(lightPositions) / sizeof(lightPositions[0]); ++i)
+        {
+            pbrManualShader.setVec3("lights[" + std::to_string(i) + "].position", lightPositions[i]);
+            pbrManualShader.setVec3("lights[" + std::to_string(i) + "].color", lightColors[i]);
+        }
+        pbrManualShader.setVec3("camPos", camera.Position);
+        pbrManualShader.setVec3("albedo", 0.3f, 0.0f, 0.0f);
+        pbrManualShader.setFloat("occlusion", 1.0f);
+
+        irradianceCubemap.activate(pbrManualShader, "irradianceMap", 0);
+        for (int row = 0; row < nrRows; ++row)
+        {
+            pbrManualShader.setFloat("metalness", (float)row / (float)(nrRows-1));
+            //pbrShader.setFloat("metalness", 1.0);
+            for (int col = 0; col < nrColumns; ++col)
+            {
+                // we clamp the roughness to 0.05 - 1.0 as perfectly smooth surfaces (roughness of 0.0) tend to look a bit off
+                // on direct lighting.
+                pbrManualShader.setFloat("roughness", glm::clamp((float)col / (float)(nrColumns-1), 0.05f, 1.0f));
+
+                model = glm::mat4(1.0f);
+                model = glm::translate(model, glm::vec3(
+                    (col - (nrColumns / 2)) * spacing,
+                    (row - (nrRows / 2)) * spacing,
+                    -3.0f
+                ));
+                pbrManualShader.setMat4("model", model);
+                pbrManualShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
+                sphere.Draw(pbrManualShader);
+            }
+        }
+
+        // 
+        pbrTextureShader.use();
+        pbrTextureShader.setMat4("view", view);
+        pbrTextureShader.setMat4("projection", projection);
+        pbrTextureShader.setInt("numLights", sizeof(lightPositions) / sizeof(lightPositions[0]));
+        for (unsigned int i = 0; i < sizeof(lightPositions) / sizeof(lightPositions[0]); ++i)
+        {
+            pbrTextureShader.setVec3("lights[" + std::to_string(i) + "].position", lightPositions[i]);
+            pbrTextureShader.setVec3("lights[" + std::to_string(i) + "].color", lightColors[i]);
+        }
+        pbrTextureShader.setBool("toggle", toggle);
+
+        if (toggle_old != toggle) 
+        { 
+            caseNr = (caseNr + 1) % 3; 
+            toggle_old = toggle;
+            std::string message = "case = " + std::to_string(caseNr);
+            std::cout << message << std::endl;
+        }
+
+        pbrTextureShader.setInt("caseNr", caseNr);
+        pbrTextureShader.setVec3("camPos", camera.Position);
+        irradianceCubemap.activate(pbrTextureShader, "irradianceMap", 0);
+        for (unsigned int i = 0; i < sizeof(spherePositions) / sizeof(spherePositions[0]); ++i) {
+            Texture albedo = sphereMaterials[i].albedo;
+            Texture normal = sphereMaterials[i].normal;
+            Texture orm = sphereMaterials[i].orm;
+            albedo.activate(pbrTextureShader, "AlbedoMap", 1);
+            normal.activate(pbrTextureShader, "NormalMap", 2);
+            orm.activate(pbrTextureShader, "ORMMap", 3);
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, spherePositions[i]);
+            pbrTextureShader.setMat4("model", model);
+            pbrTextureShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
+            sphere.Draw(pbrTextureShader);
+        }
+
+
+        // Lights
+        lightShader.use();
+        for (int i = 0; i < sizeof(lightPositions) / sizeof(lightPositions[0]); ++i) 
+        {
+            lightShader.setVec3("color", lightColors[i]);
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, lightPositions[i]);
+            model = glm::scale(model, glm::vec3(0.5f));
+            lightShader.setMat4("model", model);
+            lightShader.setMat4("view", view);
+            lightShader.setMat4("projection", projection);
+            lightShader.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
+            sphere.Draw(lightShader);
+        }
+
+
+        // Cubemap background
+        glFrontFace(GL_CW);
+        skyboxShader.use();
+        skyboxShader.setMat4("projection", projection);
+        skyboxShader.setMat4("view", view);
+        hdrEnvCubemap.activate(skyboxShader, "cubemap", 0);
+        cube.Draw(skyboxShader);
+        glFrontFace(GL_CCW);
+
+        ppfxShader.use();
+        ppfxShader.setFloat("gamma", gamma);
+        ppfxShader.setFloat("exposure", exposure);
+        ppfxShader.setFloat("bloom", bloom);
+        ppo.draw_texture_to_screen();
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Terminate
+    glfwTerminate();
+    return 0;
+}
+
 int main(void)
 {
-    switch (20)
+    switch (22)
     {
     case 0:  return base_scene(); break;
     case 1:  return main_scene(); break;
@@ -4546,6 +5061,8 @@ int main(void)
     case 18: return ssao_scene(); break;
     case 19: return kernel_test_scene(); break;
     case 20: return pbr_scene(); break;
+    case 21: return pbr_texture_scene(); break;
+    case 22: return ibl_scene(); break;
     }
 }
 
@@ -4603,12 +5120,13 @@ void processInput(GLFWwindow* window)
         ssao_key = false;
     }
 
-    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !switch_key) {
-        switchFlag = !switchFlag;
-        switch_key = true;
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !toggle_key) {
+        toggle = !toggle;
+        toggle_key = true;
+        std::cout << toggle << std::endl;
     }
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_RELEASE) {
-        switch_key = false;
+        toggle_key = false;
     }
 
     if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)

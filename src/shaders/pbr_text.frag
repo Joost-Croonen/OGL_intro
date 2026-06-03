@@ -7,15 +7,15 @@ in vec2 TexCoords;
 
 uniform sampler2D AlbedoMap;
 uniform sampler2D NormalMap;
-uniform sampler2D OcclusionRougnessMetalnessMap;
+uniform sampler2D ORMMap;
 
 struct light {
 	vec3 position;
 	vec3 color;
 };
 
-const int NR_LIGHTS = 4;
-uniform light lights[NR_LIGHTS];
+uniform light lights[4];
+uniform int numLights;
 
 uniform vec3 camPos;
 
@@ -30,7 +30,7 @@ float DistributionGGX(vec3 N, vec3 H, float roughness)
 	float NdotH2 = NdotH * NdotH;
 
 	float num = a2;
-	float denom = NdotH2 * (a2-1.0) +1;
+	float denom = NdotH2 * (a2-1.0) + 1.0;
 	denom = PI * denom * denom;
 
 	return num / denom;
@@ -39,12 +39,12 @@ float DistributionGGX(vec3 N, vec3 H, float roughness)
 float GeometrySchlickGGX(float NdotV, float k)
 {
 	float num = NdotV;
-	float denom = NdotV * (1-k) + k;
+	float denom = NdotV * (1.0 - k) + k;
 
 	return num / denom;
 }
 
-float GemoetrySmith(float NdotV, float NdotL, float roughness)
+float GeometrySmith(float NdotL, float NdotV, float roughness)
 {	
 	float r = roughness + 1.0;
 	float k = (r*r) / 8.0;
@@ -57,23 +57,25 @@ float GemoetrySmith(float NdotV, float NdotL, float roughness)
 
 vec3 fresnelSchlick(float HdotV, vec3 F0)
 {
-	return F0 +(1-F0)*pow(1 - HdotV, 5);		// maybe add calmp although shouldnt be necessary
+	return F0 +(1-F0)*pow(clamp(1 - HdotV, 0.0, 1.0), 5.0);
 }
 
 void main()
 {
+	vec3 test = vec3(0.0);
+
 	vec3 albedo = texture(AlbedoMap, TexCoords).rgb;
 	vec3 normal = texture(NormalMap, TexCoords).rgb;
 
-	float occlusion = texture(OcclusionRougnessMetalnessMap, TexCoords).r;
-	float roughness = texture(OcclusionRougnessMetalnessMap, TexCoords).g;
-	float metalness = texture(OcclusionRougnessMetalnessMap, TexCoords).b;
+	float occlusion = texture(ORMMap, TexCoords).r;
+	float roughness = texture(ORMMap, TexCoords).g;
+	float metalness = texture(ORMMap, TexCoords).b;
 
-	vec3 N = normalize(normal);
-	vec3 V = camPos - WorldPos;
+	vec3 N = normalize(Normal); // not correct, need tbn mat to change normalmap to worldspace and use those
+	vec3 V = normalize(camPos - WorldPos);
 
 	vec3 Lo = vec3(0.0);
-	for (int i=0; i<NR_LIGHTS; i++)
+	for (int i=0; i<numLights; i++)
 	{
 		vec3 L = normalize(lights[i].position - WorldPos);
 		vec3 H = normalize(L + V);
@@ -90,18 +92,20 @@ void main()
 		vec3 F = fresnelSchlick(HdotV, F0);
 
 		float D = DistributionGGX(N, H, roughness);
-		float G = GemoetrySmith(NdotV, NdotL, roughness);
+		float G = GeometrySmith(NdotL, NdotV, roughness);
 
 		vec3 num = D * G * F;
 		float denom = 4 * NdotV * NdotL + 0.0001;
 		vec3 specular = num / denom;
 
 		vec3 kS = F;
-		vec3 kD = (vec3(1.0) - kS) * (1.0 - metalness);
+		vec3 kD = (vec3(1.0) - kS);
+		kD *= (1.0 - metalness);
+		test = kD;
 
 		vec3 diffuse = kD * albedo / PI;
 		
-		Lo += (diffuse + specular) * radiance * NdotL;   
+		Lo += (diffuse + specular) * radiance * attenuation * NdotL;   
 	}
 	vec3 ambient = vec3(0.03) * albedo * occlusion;
 	vec3 color = Lo + ambient;
@@ -110,4 +114,6 @@ void main()
 	color = pow(color, vec3(1.0/2.2));			// gamma correction
 
 	FragColor = vec4(color, 1.0);
+	test = albedo;
+	//FragColor = vec4(test, 1.0);
 }

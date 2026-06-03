@@ -23,6 +23,10 @@ public:
 	void attach(GLenum type) const {
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, type, GL_RENDERBUFFER, id);
 	}
+	void edit(unsigned int width, unsigned int height, GLenum type) {
+		glBindRenderbuffer(GL_RENDERBUFFER, id);
+		glRenderbufferStorage(GL_RENDERBUFFER, type, width, height);
+	}
 	void Delete() const {
 		glDeleteRenderbuffers(1, &id);
 	}
