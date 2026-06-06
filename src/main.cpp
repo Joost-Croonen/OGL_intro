@@ -4761,6 +4761,7 @@ int ibl_scene() {
 
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
     // Setup geometry, textures, buffers and shaders --------------------
     // Vertices
@@ -4770,9 +4771,13 @@ int ibl_scene() {
     Shader pbrTextureShader("../../../src/shaders/vertex_advanced.vert", "../../../src/shaders/pbr_ibl_text.frag");
     Shader lightShader("../../../src/shaders/vertex_advanced.vert", "../../../src/shaders/solid.frag");
     Shader equirectToCubemapShader("../../../src/shaders/cube_project.vert", "../../../src/shaders/equirect.frag");
-    Shader radianceConvolutionShader("../../../src/shaders/cube_project.vert", "../../../src/shaders/radiance_convolution.frag");
+    Shader diffEnvMapPrefilterShader("../../../src/shaders/cube_project.vert", "../../../src/shaders/envMapPrefilterDiffuse.frag");
+    Shader specEnvMapPrefilterShader("../../../src/shaders/cube_project.vert", "../../../src/shaders/envMapPrefilterSpecular.frag");
+    Shader brdfPrecomputeShader("../../../src/shaders/screen.vert", "../../../src/shaders/brdf_precompute.frag");
     Shader skyboxShader("../../../src/shaders/cubemap.vert", "../../../src/shaders/cubemap.frag");
     Shader ppfxShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
+    Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/screen.frag");
+
 
     // Load textures
     Texture rustedIronAlbedo("../../../src/textures/rusted_iron/albedo.png", gamma_correct);
@@ -4800,6 +4805,7 @@ int ibl_scene() {
     // Models & meshes
     Model sphere = Model("../../../src/models/sphere/sphere.obj", gamma_correct);
     Model cube = Model(Cube(glm::vec3(1.0), 1.0, std::vector<TextureData>{}));
+    ScreenQuad screen = ScreenQuad();
 
     // Model transformations
     int nrRows = 7;
@@ -4830,23 +4836,27 @@ int ibl_scene() {
     };
     glm::vec3 lightColors[] = {
         glm::vec3(300.0f, 300.0f, 300.0f),
-        glm::vec3(0.0f, 0.0f, 0.0f),
-        glm::vec3(0.0f, 0.0f, 0.0f),
-        glm::vec3(0.0f, 0.0f, 0.0f)
+        glm::vec3(300.0f, 300.0f, 300.0f),
+        glm::vec3(300.0f, 300.0f, 300.0f),
+        glm::vec3(300.0f, 300.0f, 300.0f)
     };
 
+    // Resolutions
+    unsigned int envMapRes = 512;
+    unsigned int diffEnvMapRes = 32;
+    unsigned int specEnvMapRes = 128;
+    unsigned int brdfLutRes = 512;
 
     // Render object setup
     PPO ppo = PPO(ppfxShader, SCR_WIDTH, SCR_HEIGHT);
     FBO captureFBO = FBO();
     captureFBO.bind();
-    RBO captureRBO = RBO(512, 512, GL_DEPTH_COMPONENT24);
+    RBO captureRBO = RBO(envMapRes, envMapRes, GL_DEPTH_COMPONENT24);
     captureRBO.bind();
     captureRBO.attach(GL_DEPTH_ATTACHMENT);
+    captureFBO.check_status();
     
-    // HDR cubemap setup
-    Cubemap hdrEnvCubemap = Cubemap(512, 512, GL_RGB16F, 1, GL_LINEAR, GL_LINEAR);
-    captureFBO.bind();
+    // Cubemap capture camera setup
     glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
     glm::mat4 captureViews[] = {
            glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
@@ -4856,10 +4866,14 @@ int ibl_scene() {
            glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
            glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
     };
+
+    // HDR cubemap setup
+    Cubemap hdrEnvCubemap = Cubemap(envMapRes, envMapRes, GL_RGB16F, 1, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
+    captureFBO.bind();
     equirectToCubemapShader.use();
     hdr.activate(equirectToCubemapShader, "equirectangularMap", 0);
     equirectToCubemapShader.setMat4("projection", captureProjection);
-    glViewport(0, 0, 512, 512);
+    glViewport(0, 0, envMapRes, envMapRes);
     glFrontFace(GL_CW);
     for (unsigned int i = 0; i < 6; ++i)
     {
@@ -4871,23 +4885,62 @@ int ibl_scene() {
     glFrontFace(GL_CCW);
     captureFBO.unbind();
 
-    // radiance convolution to irradiance cubemap
-    Cubemap irradianceCubemap = Cubemap(32, 32, GL_RGB16F, 1, GL_LINEAR, GL_LINEAR);
+    hdrEnvCubemap.generateMipMaps();
+
+    // Diffuse envrionment map prefiltering
+    Cubemap diffEnvCubemap = Cubemap(diffEnvMapRes, diffEnvMapRes, GL_RGB16F, 1, GL_LINEAR, GL_LINEAR);
     captureFBO.bind();
-    captureRBO.edit(32, 32, GL_DEPTH_COMPONENT24);
-    radianceConvolutionShader.use();
-    hdrEnvCubemap.activate(radianceConvolutionShader, "environmentMap", 0);
-    radianceConvolutionShader.setMat4("projection", captureProjection);
-    glViewport(0, 0, 32, 32);
+    captureRBO.edit(diffEnvMapRes, diffEnvMapRes, GL_DEPTH_COMPONENT24);
+    diffEnvMapPrefilterShader.use();
+    hdrEnvCubemap.activate(diffEnvMapPrefilterShader, "environmentMap", 0);
+    diffEnvMapPrefilterShader.setMat4("projection", captureProjection);
+    glViewport(0, 0, diffEnvMapRes, diffEnvMapRes);
     glFrontFace(GL_CW);
     for (unsigned int i = 0; i < 6; ++i)
     {
-        radianceConvolutionShader.setMat4("view", captureViews[i]);
-        irradianceCubemap.attachFace(GL_COLOR_ATTACHMENT0, i);
+        diffEnvMapPrefilterShader.setMat4("view", captureViews[i]);
+        diffEnvCubemap.attachFace(GL_COLOR_ATTACHMENT0, i);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        cube.Draw(radianceConvolutionShader);
+        cube.Draw(diffEnvMapPrefilterShader);
     }
     glFrontFace(GL_CCW);
+    captureFBO.unbind();
+
+    // Specular environment map prefiltering
+    Cubemap specEnvCubemap = Cubemap(specEnvMapRes, specEnvMapRes, GL_RGB16F, 1, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
+    specEnvCubemap.generateMipMaps();
+    captureFBO.bind();
+    specEnvMapPrefilterShader.use();
+    hdrEnvCubemap.activate(specEnvMapPrefilterShader, "environmentMap", 0);
+    specEnvMapPrefilterShader.setMat4("projection", captureProjection);
+    glFrontFace(GL_CW);
+    unsigned int maxMipLevels = 5;
+    for (unsigned int mip = 0; mip < maxMipLevels; ++mip) {
+        specEnvMapPrefilterShader.setFloat("roughness", (float)mip / (float)(maxMipLevels - 1));
+        unsigned int mipWidth = specEnvMapRes * std::pow(0.5, mip);
+        unsigned int mipHeight = specEnvMapRes * std::pow(0.5, mip);
+        captureRBO.edit(mipWidth, mipHeight, GL_DEPTH_COMPONENT24);
+        glViewport(0, 0, mipWidth, mipHeight);
+        for (unsigned int i = 0; i < 6; ++i)
+        {
+            specEnvMapPrefilterShader.setMat4("view", captureViews[i]);
+            specEnvCubemap.attachFace(GL_COLOR_ATTACHMENT0, i, mip);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            cube.Draw(specEnvMapPrefilterShader);
+        }
+    }
+    glFrontFace(GL_CCW);
+    captureFBO.unbind();
+
+    // BRDF integration lookup table 
+    Texture brdfLUT = Texture(brdfLutRes, brdfLutRes, GL_RGB16F, 1, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
+    captureFBO.bind();
+    captureRBO.edit(brdfLutRes, brdfLutRes, GL_DEPTH_COMPONENT24);
+    brdfLUT.attach(GL_COLOR_ATTACHMENT0);
+    glViewport(0, 0, brdfLutRes, brdfLutRes);
+    brdfPrecomputeShader.use();
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    screen.Draw();
     captureFBO.unbind();
 
 
@@ -4934,8 +4987,9 @@ int ibl_scene() {
         pbrManualShader.setVec3("camPos", camera.Position);
         pbrManualShader.setVec3("albedo", 0.3f, 0.0f, 0.0f);
         pbrManualShader.setFloat("occlusion", 1.0f);
-
-        irradianceCubemap.activate(pbrManualShader, "irradianceMap", 0);
+        diffEnvCubemap.activate(pbrManualShader, "diffuseEnvMap", 0);
+        specEnvCubemap.activate(pbrManualShader, "specularEnvMap", 1);
+        brdfLUT.activate(pbrManualShader, "brdfLUT", 2);
         for (int row = 0; row < nrRows; ++row)
         {
             pbrManualShader.setFloat("metalness", (float)row / (float)(nrRows-1));
@@ -4944,7 +4998,7 @@ int ibl_scene() {
             {
                 // we clamp the roughness to 0.05 - 1.0 as perfectly smooth surfaces (roughness of 0.0) tend to look a bit off
                 // on direct lighting.
-                pbrManualShader.setFloat("roughness", glm::clamp((float)col / (float)(nrColumns-1), 0.05f, 1.0f));
+                pbrManualShader.setFloat("roughness", glm::clamp((float)col / (float)(nrColumns-1), 0.1f, 1.0f));
 
                 model = glm::mat4(1.0f);
                 model = glm::translate(model, glm::vec3(
@@ -4968,26 +5022,17 @@ int ibl_scene() {
             pbrTextureShader.setVec3("lights[" + std::to_string(i) + "].position", lightPositions[i]);
             pbrTextureShader.setVec3("lights[" + std::to_string(i) + "].color", lightColors[i]);
         }
-        pbrTextureShader.setBool("toggle", toggle);
-
-        if (toggle_old != toggle) 
-        { 
-            caseNr = (caseNr + 1) % 3; 
-            toggle_old = toggle;
-            std::string message = "case = " + std::to_string(caseNr);
-            std::cout << message << std::endl;
-        }
-
-        pbrTextureShader.setInt("caseNr", caseNr);
         pbrTextureShader.setVec3("camPos", camera.Position);
-        irradianceCubemap.activate(pbrTextureShader, "irradianceMap", 0);
+        diffEnvCubemap.activate(pbrTextureShader, "diffuseEnvMap", 0);
+        specEnvCubemap.activate(pbrTextureShader, "specularEnvMap", 1);
+        brdfLUT.activate(pbrTextureShader, "brdfLUT", 2);
         for (unsigned int i = 0; i < sizeof(spherePositions) / sizeof(spherePositions[0]); ++i) {
             Texture albedo = sphereMaterials[i].albedo;
             Texture normal = sphereMaterials[i].normal;
             Texture orm = sphereMaterials[i].orm;
-            albedo.activate(pbrTextureShader, "AlbedoMap", 1);
-            normal.activate(pbrTextureShader, "NormalMap", 2);
-            orm.activate(pbrTextureShader, "ORMMap", 3);
+            albedo.activate(pbrTextureShader, "AlbedoMap", 3);
+            normal.activate(pbrTextureShader, "NormalMap", 4);
+            orm.activate(pbrTextureShader, "ORMMap", 5);
             model = glm::mat4(1.0f);
             model = glm::translate(model, spherePositions[i]);
             pbrTextureShader.setMat4("model", model);
@@ -5017,15 +5062,29 @@ int ibl_scene() {
         skyboxShader.use();
         skyboxShader.setMat4("projection", projection);
         skyboxShader.setMat4("view", view);
-        hdrEnvCubemap.activate(skyboxShader, "cubemap", 0);
+        if (toggle_old != toggle)
+        {
+            caseNr = (caseNr + 1) % 4;
+            toggle_old = toggle;
+            std::string message = "case = " + std::to_string((float)caseNr);
+            std::cout << message << std::endl;
+        }
+        skyboxShader.setFloat("mipLevel", (float)caseNr);
+        specEnvCubemap.activate(skyboxShader, "cubemap", 0);
         cube.Draw(skyboxShader);
         glFrontFace(GL_CCW);
 
+        // post processing (gamma and exposure correction)
         ppfxShader.use();
         ppfxShader.setFloat("gamma", gamma);
         ppfxShader.setFloat("exposure", exposure);
         ppfxShader.setFloat("bloom", bloom);
         ppo.draw_texture_to_screen();
+
+        // debug texture
+        //screenShader.use();
+        //brdfLUT.activate(screenShader, "screenTexture", 0);
+        //screen.Draw();
 
         // Swap buffers and poll for IO events
         glfwSwapBuffers(window);

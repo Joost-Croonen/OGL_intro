@@ -9,7 +9,9 @@ uniform sampler2D AlbedoMap;
 uniform sampler2D NormalMap;
 uniform sampler2D ORMMap;
 
-uniform samplerCube irradianceMap;
+uniform samplerCube diffuseEnvMap;
+uniform samplerCube specularEnvMap;
+uniform sampler2D brdfLUT;
 
 struct light {
 	vec3 position;
@@ -18,9 +20,6 @@ struct light {
 
 uniform light lights[4];
 uniform int numLights;
-
-uniform bool toggle;
-uniform int caseNr;
 
 uniform vec3 camPos;
 
@@ -44,7 +43,7 @@ vec3 worldNormalGradientTrick(vec3 tangentNormalMap)
     return normalize(TBN * tangentNormal);
 }
 
-vec3 worldNormalGrammSchmidt(vec3 tangentNormalMap)
+vec3 worldNormalGuidingVectorTrick(vec3 tangentNormalMap)
 {
     vec3 tangentNormal = tangentNormalMap * 2.0 - 1.0;
 
@@ -149,20 +148,6 @@ void main()
 	float roughness = texture(ORMMap, TexCoords).g;
 	float metalness = texture(ORMMap, TexCoords).b;
 
-	
-	//vec3 N = vec3(0.0);
-	//vec3 Ngt = worldNormalGradientTrick(normal);
-	//vec3 Ngs = worldNormalGrammSchmidt(normal);
-	//vec3 Nf = worldNormal(normal);
-	//if (caseNr == 0){
-	//	N = Nf;
-	//}
-	//else if (caseNr == 1){
-	//	N = Ngt;
-	//}
-	//else if (caseNr == 2){
-	//	N = Ngs;
-	//}
 	vec3 N = worldNormal(normal);
 	vec3 V = normalize(camPos - WorldPos);
 	float NdotV = max(dot(N, V), 0.0);
@@ -170,6 +155,7 @@ void main()
 	vec3 Lo = vec3(0.0);
 	
 	vec3 F0 = mix(F0_base, albedo, metalness);
+	//roughness *= roughness;
 
 	// Lightsource contribution
 	for (int i=0; i<numLights; i++)
@@ -201,31 +187,29 @@ void main()
 		Lo += (diffuse + specular) * radiance * NdotL;   
 	}
 	// Environment contribution
-	vec3 kS = fresnelSchlickRoughness(NdotV, F0, roughness);
+	// Specular environment
+	vec3 R = reflect(-V, N);  
+	const float MAX_REFLECTION_LOD = 4.0;
+	vec3 specIrradiance = textureLod(specularEnvMap, R, roughness * MAX_REFLECTION_LOD).rgb;
+
+	vec2 split_brdf = texture(brdfLUT, vec2(NdotV, roughness)).rg;
+	vec3 brdf = F0 * split_brdf.x + split_brdf.y;
+	vec3 specular = specIrradiance * brdf;
+
+	// Diffuse environment	
+	vec3 F = fresnelSchlickRoughness(NdotV, F0, roughness);
+	vec3 kS = F;
 	vec3 kD = 1.0 - kS;
 	kD *= (1.0 - metalness);
-	vec3 irradiance = texture(irradianceMap, N).rgb;
+	vec3 irradiance = texture(diffuseEnvMap, N).rgb;
 	vec3 diffuse = kD * irradiance * albedo;
-	vec3 ambient = diffuse * occlusion;
+
+	// Combine environment lighting
+	vec3 ambient = (diffuse + specular) * occlusion;
+	// Final gather
 	vec3 color = Lo;
-	//ambient = vec3(0.03) * albedo;
 	color += ambient;
 
-	//test = mix(color, vec3(1.0), fresnelSchlickRoughness(NdotV, F0, roughness));
-	//test = texture(AlbedoMap, TexCoords).rgb;
-	//vec3 Ngt = worldNormalGradientTrick(normal)*0.5 + 0.5;
-	//vec3 Ngs = worldNormalGrammSchmidt(normal)*0.5 + 0.5;
-	//vec3 Nf = worldNormal(normal)*0.5 + 0.5;
-	//if (caseNr == 0){
-	//	test = Nf;
-	//}
-	//else if (caseNr == 1){
-	//	test = Ngt;
-	//}
-	//else if (caseNr == 2){
-	//	test = Ngs;
-	//}
-	//test = toggle ? Ngs: Nf;
 	FragColor = vec4(color, 1.0);
 	//FragColor = vec4(test, 1.0);
 }

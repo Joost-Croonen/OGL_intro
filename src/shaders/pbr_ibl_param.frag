@@ -10,7 +10,9 @@ uniform float occlusion;
 uniform float roughness;
 uniform float metalness;
 
-uniform samplerCube irradianceMap;
+uniform samplerCube diffuseEnvMap;
+uniform samplerCube specularEnvMap;
+uniform sampler2D brdfLUT;
 
 struct light {
 	vec3 position;
@@ -78,6 +80,7 @@ void main()
 
 	vec3 Lo = vec3(0.0);
 	
+	float r = roughness; // * roughness;
 	vec3 F0 = mix(F0_base, albedo, metalness);
 
 	// Lightsource contribution
@@ -94,8 +97,8 @@ void main()
 		vec3 radiance		= lights[i].color * attenuation;
 
 		vec3 F = fresnelSchlick(HdotV, F0);
-		float D = DistributionGGX(N, H, roughness);
-		float G = GeometrySmith(NdotL, NdotV, roughness);
+		float D = DistributionGGX(N, H, r);
+		float G = GeometrySmith(NdotL, NdotV, r);
 
 		vec3 num = D * G * F;
 		float denom = 4 * NdotV * NdotL + 0.0001;
@@ -110,17 +113,28 @@ void main()
 		Lo += (diffuse + specular) * radiance * NdotL;   
 	}
 	// Environment contribution
-	vec3 kS = fresnelSchlickRoughness(NdotV, F0, roughness);
+	// Specular environment
+	vec3 R = reflect(-V, N);  
+	const float MAX_REFLECTION_LOD = 4.0;
+	vec3 specIrradiance = textureLod(specularEnvMap, R, r * MAX_REFLECTION_LOD).rgb;
+
+	vec2 split_brdf = texture(brdfLUT, vec2(NdotV, r)).rg;
+	vec3 brdf = F0 * split_brdf.x + split_brdf.y;
+	vec3 specular = specIrradiance * brdf;
+
+	// Diffuse environment
+	vec3 F = fresnelSchlickRoughness(NdotV, F0, r);
+	vec3 kS = F;
 	vec3 kD = 1.0 - kS;
 	kD *= (1.0 - metalness);
-	vec3 irradiance = texture(irradianceMap, N).rgb;
+	vec3 irradiance = texture(diffuseEnvMap, N).rgb;
 	vec3 diffuse = kD * irradiance * albedo;
-	vec3 ambient = diffuse * occlusion;
-	vec3 color = Lo;
-	//ambient = vec3(0.03) * albedo;
-	color += ambient;
 
-	test = mix(color, vec3(1.0), fresnelSchlickRoughness(NdotV, F0, roughness));
+	// Combine environment lighting
+	vec3 ambient = (diffuse + specular) * occlusion;
+	// Final gather
+	vec3 color = Lo;
+	color += ambient;
 
 	FragColor = vec4(color, 1.0);
 	//FragColor = vec4(test, 1.0);

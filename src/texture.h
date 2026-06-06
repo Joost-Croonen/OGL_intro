@@ -358,9 +358,15 @@ public:
         glFramebufferTexture(GL_FRAMEBUFFER, attachement, id, 0);
     }
 
-    void attachFace(GLenum attachement, unsigned int face) const
+    void attachFace(GLenum attachement, unsigned int face, unsigned int mipLevel=0) const
     {
-        glFramebufferTexture2D(GL_FRAMEBUFFER, attachement, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, id, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, attachement, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, id, mipLevel);
+    }
+
+    void generateMipMaps() const
+    {
+        glBindTexture(GL_TEXTURE_CUBE_MAP, id);
+        glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
     }
 
 private:
