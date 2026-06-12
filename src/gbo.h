@@ -25,7 +25,7 @@ public:
     Texture albedoSpecGBuffer;
     Texture normalGbuffer;
     Texture positionGbuffer;
-    //Texture depthTex;
+    Texture depthGbuffer;
     Shader gbufferShader;
     Shader deferredShader;
     GBO(int width, int height, Shader gBufferShader, Shader deferredShader) :
@@ -39,9 +39,11 @@ public:
         rbo(RBO(width, height, GL_DEPTH24_STENCIL8, 1)),
         albedoSpecGBuffer(Texture(width, height, GL_RGBA, 1, GL_NEAREST, GL_NEAREST, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE)),
         normalGbuffer(Texture(width, height, GL_RGBA16F, 1, GL_NEAREST, GL_NEAREST, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE)),
-        positionGbuffer(Texture(width, height, GL_RGBA16F, 1, GL_NEAREST, GL_NEAREST, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE))
-        //depthTex(Texture(width, height, GL_DEPTH_COMPONENT, 1, GL_NEAREST, GL_NEAREST, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE))
+        positionGbuffer(Texture(width, height, GL_RGBA16F, 1, GL_NEAREST, GL_NEAREST, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE)),
+        depthGbuffer(Texture(width, height, GL_DEPTH_COMPONENT32F, 1, GL_NEAREST, GL_NEAREST, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE))
     {
+        //depthGbuffer.generateMipMaps();
+
         vao.bind();
         vao.linkVBO(vbo);
         vao.linkEBO(ebo);
@@ -49,13 +51,13 @@ public:
         vao.unbind();
 
         fbo.bind();
-        //depthTex.attach(GL_DEPTH_ATTACHMENT);
+        depthGbuffer.attach(GL_DEPTH_ATTACHMENT);
         positionGbuffer.attach(GL_COLOR_ATTACHMENT0);
         normalGbuffer.attach(GL_COLOR_ATTACHMENT1);
         albedoSpecGBuffer.attach(GL_COLOR_ATTACHMENT2); 
         GLenum attachments[3] = { GL_COLOR_ATTACHMENT0 , GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
         fbo.multiDrawBuffers(3, attachments);
-        rbo.attach(GL_DEPTH_STENCIL_ATTACHMENT);
+        //rbo.attach(GL_DEPTH_STENCIL_ATTACHMENT);
         fbo.check_status();
         fbo.unbind();
     }

@@ -15,6 +15,7 @@ void main()
     gPosition = FragPos;
     gNormal = normalize(Normal);
     gAlbedoSpec.rgb = vec3(0.95);
-    //gAlbedoSpec.rgb = texture(texture_diffuse1, TexCoords).rgb;
+    gAlbedoSpec.a = 1.0;
+    gAlbedoSpec.rgb = texture(texture_diffuse1, TexCoords).rgb;
     //gAlbedoSpec.a = texture(texture_specular1, TexCoords).r;
 }  

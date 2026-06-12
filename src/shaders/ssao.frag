@@ -23,7 +23,7 @@ void main()
 {
 	 vec3 fragPos = texture(gPosition, TexCoords).xyz;				//world
 	 vec3 normal = texture(gNormal, TexCoords).rgb;					//world
-	 vec3 randVec = texture(ssaoNoise, TexCoords * noiseScale).xyz;	//???? viewspace perp to viewdir
+	 vec3 randVec = texture(ssaoNoise, TexCoords * noiseScale).xyz;	//viewspace perp to viewdir
 
 	 fragPos = (view * vec4(fragPos, 1.0)).xyz;						//view
 	 normal = mat3(view) * normal;									//view  this works bc V = (V)^-1^T

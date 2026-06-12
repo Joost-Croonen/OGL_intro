@@ -211,5 +211,6 @@ void main()
 	color += ambient;
 
 	FragColor = vec4(color, 1.0);
+	//test = vec3(roughness);
 	//FragColor = vec4(test, 1.0);
 }

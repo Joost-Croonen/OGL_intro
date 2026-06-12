@@ -1,0 +1,62 @@
+#version 330 core
+out vec4 FragColor;
+
+in vec2 TexCoords;
+
+uniform sampler2D gPosition;
+uniform sampler2D gNormal;
+uniform sampler2D gAlbedoSpec;
+uniform sampler2D ssaoColorBuffer;
+uniform sampler2D ssrColorBuffer;
+
+
+struct light {
+	vec3 position;
+	vec3 color;
+	float attenuation;
+};
+
+const int NR_LIGHTS = 32;
+uniform light lights[NR_LIGHTS];
+uniform vec3 viewPos;
+uniform bool ssaoFlag;
+
+void main()	
+{
+	// retrieve from gbuffer
+	vec3 FragPos = texture(gPosition, TexCoords).rgb;
+	vec3 Normal = texture(gNormal, TexCoords).rgb;
+	vec3 Albedo = texture(gAlbedoSpec, TexCoords).rgb;
+	float Specular = texture(gAlbedoSpec, TexCoords).a;
+	float ambient_occlusion = 1;
+	if (ssaoFlag) ambient_occlusion = texture(ssaoColorBuffer, TexCoords).r;
+	// lighting
+	vec3 norm = normalize(Normal);
+	vec3 viewDir = normalize(viewPos - FragPos);
+	//float ambientSky = dot(norm + vec3(0.0, 1.0, 0.0), vec3(0.0, 1.0, 0.0))/2.0;   // to give some upward direciton to the ambient light
+	vec3 lighting = Albedo * ambient_occlusion * 0.1; // * ambientSky;
+	for(int i = 0; i < NR_LIGHTS; ++i)
+	{
+		// attentunation
+		float dist = length(lights[i].position - FragPos);
+		float attenuation = 1.0 / pow(dist, lights[i].attenuation);
+		// Diffuse
+		vec3 lightDir = normalize(lights[i].position - FragPos);
+		vec3 diffuse = max(dot(lightDir, norm), 0.0) * Albedo * lights[i].color;
+		// Specular
+		vec3 halfVec = normalize(lightDir + viewDir);
+		vec3 specular = pow(max(dot(norm, halfVec), 0.0), 16.0) * Specular * lights[i].color;
+		lighting += attenuation * (diffuse + specular);
+	}
+	vec3 reflection = vec3(0.0);
+	if (Specular > 0.9)
+	{
+		reflection = texture(ssrColorBuffer, TexCoords).rgb;
+		if (length(reflection) > 0.0){
+			lighting += 0.45 * reflection;
+		}
+	}
+	
+
+	FragColor = vec4(lighting, 1.0);
+}

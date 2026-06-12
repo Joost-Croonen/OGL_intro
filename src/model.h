@@ -12,9 +12,9 @@ public:
 	std::string directory;
 	std::vector<TextureData> textures_loaded;
 	bool gammaCorrection = false;
-	Model(const char* path, bool gamma = false): gammaCorrection(gamma)
+	Model(const char* path, bool gamma = false, bool FlipUVs = true): gammaCorrection(gamma)
 	{
-		loadModel(path);
+		loadModel(path, FlipUVs);
 	}
 	Model(Mesh mesh)
 	{
@@ -34,10 +34,14 @@ public:
 		}
 	}
 private:
-	void loadModel(std::string path){
+	void loadModel(std::string path, bool flipUVs=true){
 		// assimp load scene
 		Assimp::Importer importer;
-		const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
+		unsigned int importFlags = aiProcess_Triangulate | aiProcess_CalcTangentSpace;
+		if (flipUVs) {
+			importFlags |= aiProcess_FlipUVs;
+		}
+		const aiScene* scene = importer.ReadFile(path, importFlags);
 		// error handling
 		if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
 		{
@@ -93,11 +97,11 @@ private:
 			{
 				vector.x = mesh->mTangents[i].x;
 				vector.y = mesh->mTangents[i].y;
-				vector.y = mesh->mTangents[i].y;
+				vector.z = mesh->mTangents[i].z;
 				vertex.Tangent = vector;
 				vector.x = mesh->mBitangents[i].x;
 				vector.y = mesh->mBitangents[i].y;
-				vector.y = mesh->mBitangents[i].y;
+				vector.z = mesh->mBitangents[i].z;
 				vertex.Bitangent = vector;
 			}
 			vertices.push_back(vertex);

@@ -5,6 +5,7 @@ in vec2 TexCoords;
 
 uniform sampler2D depthMap;
 uniform bool perspective;
+uniform int lod = 0;
 
 //void main()
 //{             
@@ -16,7 +17,7 @@ uniform bool perspective;
 void main()
 {    
     //float depth = gl_FragCoord.z;
-    float depth = texture(depthMap, TexCoords).r;
+    float depth = textureLod(depthMap, TexCoords, lod).r;
     float ndc = 2.0 * depth - 1.0;
     float near = 0.1;
     float far = 100.0;

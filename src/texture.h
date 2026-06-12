@@ -122,9 +122,9 @@ public:
     {
         GLenum dataFormat;
         GLenum pixelType;
-        if (internalFormat == GL_DEPTH_COMPONENT)
+        if (internalFormat == GL_DEPTH_COMPONENT || internalFormat == GL_DEPTH_COMPONENT32F)
         {
-            dataFormat = internalFormat;
+            dataFormat = GL_DEPTH_COMPONENT;
             nrChannels = 1;
             pixelType = GL_FLOAT;
         }
@@ -178,9 +178,9 @@ public:
     {
         GLenum dataFormat;
         GLenum pixelType;
-        if (internalFormat == GL_DEPTH_COMPONENT)
+        if (internalFormat == GL_DEPTH_COMPONENT || internalFormat == GL_DEPTH_COMPONENT32F)
         {
-            dataFormat = internalFormat;
+            dataFormat = GL_DEPTH_COMPONENT;
             nrChannels = 1;
             pixelType = GL_FLOAT;
         }
@@ -245,12 +245,24 @@ public:
         glBindTexture(GL_TEXTURE_2D, id);
     }
 
-    void attach(GLenum attachement) const
+    void attach(GLenum attachement, unsigned int mipLevel = 0) const
     {
         if (samples==1)
-            glFramebufferTexture2D(GL_FRAMEBUFFER, attachement, GL_TEXTURE_2D, id, 0);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, attachement, GL_TEXTURE_2D, id, mipLevel);
         else
-            glFramebufferTexture2D(GL_FRAMEBUFFER, attachement, GL_TEXTURE_2D_MULTISAMPLE, id, 0);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, attachement, GL_TEXTURE_2D_MULTISAMPLE, id, mipLevel);
+    }
+
+    void generateMipMaps() const {
+        glBindTexture(GL_TEXTURE_2D, id);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+
+    void restrictMipLevels(unsigned int texture_unit, int minLod, int maxLod) {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, id);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, minLod);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, maxLod);
     }
 
     std::string get_path() { return std::string(albedoPath); }
