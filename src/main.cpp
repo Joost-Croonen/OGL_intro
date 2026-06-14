@@ -5192,7 +5192,7 @@ int ssr_scene() {
     Shader ssaoShader("../../../src/shaders/screen.vert", "../../../src/shaders/ssao.frag");
     Shader ssaoBlurShader("../../../src/shaders/screen.vert", "../../../src/shaders/ssaoBlur.frag");
     Shader hiZShader("../../../src/shaders/screen.vert", "../../../src/shaders/HiZ.frag");
-    Shader ssrShader("../../../src/shaders/ssr.vert", "../../../src/shaders/ssr_simple.frag");
+    Shader ssrShader("../../../src/shaders/ssr.vert", "../../../src/shaders/ssr_pixel.frag");
     Shader ppfxShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
     Shader ssaoVizShader("../../../src/shaders/screen.vert", "../../../src/shaders/ssao_visualiser.frag");
     Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/screen.frag");
@@ -5420,8 +5420,8 @@ int ssr_scene() {
         hiZBuffer.activate(ssrShader, "gDepth", 0);
         //GBuffer.depthGbuffer.activate(ssrShader, "gDepth", 0);
         GBuffer.normalGbuffer.activate(ssrShader, "gNormal", 1);
-        //GBuffer.albedoSpecGBuffer.activate(ssrShader, "gColor", 2);
-        ppo.screenTexture.activate(ssrShader, "gColor", 2);
+        GBuffer.albedoSpecGBuffer.activate(ssrShader, "gColor", 2);
+        //ppo.screenTexture.activate(ssrShader, "gColor", 2);
         screen.Draw();
         //float pixel[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
         //glReadPixels(1*SCR_WIDTH/2, SCR_HEIGHT/2, 1, 1, GL_RGBA, GL_FLOAT, pixel);
@@ -5465,10 +5465,10 @@ int ssr_scene() {
         ppo.draw_texture_to_screen();
 
         // Debugging
-        //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        //screenShader.use();
-        //ssrBuffer.activate(screenShader, "screenTexture", 0);
-        //screen.Draw();
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        screenShader.use();
+        ssrBuffer.activate(screenShader, "screenTexture", 0);
+        screen.Draw();
         
         //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         //depthShader.use();
