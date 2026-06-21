@@ -5499,6 +5499,208 @@ int ssr_scene() {
     return 0;
 }
 
+int terrain_scene() {
+    // Variable setup
+    const unsigned int MS_SAMPLES = 1;
+    float gamma = 2.2;      // best to use 2.2
+    bool manual_gamma = true;
+    bool gamma_correct = (gamma != 1.0);
+
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, MS_SAMPLES);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+    int fbWidth, fbHeight;
+    glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+
+    // OGL state setup --------------------------------------------------
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    //glEnable(GL_BLEND);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    if (MS_SAMPLES > 1) glEnable(GL_MULTISAMPLE);
+
+    if (gamma_correct && !manual_gamma) glEnable(GL_FRAMEBUFFER_SRGB);
+
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+    const unsigned int RESTART_INDEX = 0xFFFFFFFF;
+    glEnable(GL_PRIMITIVE_RESTART);
+    glPrimitiveRestartIndex(RESTART_INDEX);
+
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+
+    // Setup geometry, textures, buffers and shaders --------------------
+    // Vertices
+
+    // Shaders
+    Shader simpleShader("../../../src/shaders/height.vert", "../../../src/shaders/height.frag");
+    Shader ppfxShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
+    Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/screen.frag");
+
+
+    // Load textures
+    // Texture heightmap("../../../src/textures/iceland_heightmap.png", false);
+    int width, height, nChannels;
+    stbi_set_flip_vertically_on_load(true);
+    unsigned char* data = stbi_load("../../../src/textures/iceland_heightmap.png",
+        &width, &height, &nChannels,
+        0);
+
+    // Models & meshes
+    ScreenQuad screen = ScreenQuad();
+    std::vector<float> vertices;
+    float yScale = 64.0f / 256.0f;
+    float yShift = 16.0f;
+    if (data) {
+        for (unsigned int i = 0; i < height; i++)
+        {
+            for (unsigned int j = 0; j < width; j++)
+            {
+                unsigned char* texel = data + (j + width * i) * nChannels;
+                unsigned char y = texel[0];
+                vertices.push_back(-height / 2.0f + i); //x
+                vertices.push_back((int)y * yScale - yShift); //y
+                vertices.push_back(-width / 2.0f + j); //z
+            }
+        }
+        stbi_image_free(data);
+    }
+    else {
+        std::printf("no data in: ../../../src/textures/iceland_heightmap.png");
+    }
+    
+
+    const unsigned int NUM_STRIPS = height - 1;
+    const unsigned int NUM_VERTS_PER_STRIP = width * 2;
+    std::vector<int> indices;
+    //for (unsigned int i = 0; i < height - 1; i++)       // for each row a.k.a. each strip
+    //{
+    //    for (unsigned int j = 0; j < width; j++)      // for each column
+    //    {
+    //        for (unsigned int k = 0; k < 2; k++)      // for each side of the strip
+    //        {
+    //            indices.push_back(j + width * (i + k));
+    //        }
+    //    }
+    //}
+
+    for (unsigned int i = 0; i < height - 1; ++i) {
+        for (unsigned int j = 0; j < width; ++j) {
+            indices.push_back(j + width * i + width);
+            indices.push_back(j + width * i);
+        }
+        indices.push_back(RESTART_INDEX);
+    }
+
+    VAO terrainVAO = VAO();
+    terrainVAO.bind();
+    VBO terrainVBO = VBO(vertices);
+    terrainVAO.linkVBO(terrainVBO);
+    EBO terrainEBO = EBO(indices);
+    terrainVAO.linkEBO(terrainEBO);
+    terrainVAO.setAttributes(3, 0, 0, 0);
+    terrainVAO.unbind();
+
+    // Lights
+    
+    // Render object setup
+    PPO ppo = PPO(screenShader, SCR_WIDTH, SCR_HEIGHT);
+    
+    // shader setup
+
+    // Background
+    float clear_color[] = { pow(0.1, gamma), pow(0.1, gamma), pow(0.1, gamma), 1.0 };
+
+
+    bool toggle_old = toggle;
+    int caseNr = 0;
+
+    // Main render loop ---------------------------------------------------
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 10000.0f);
+        glm::mat4 model = glm::mat4(1.0f);
+        simpleShader.use();
+        simpleShader.setMat4("model", model);
+        simpleShader.setMat4("view", view);
+        simpleShader.setMat4("projection", projection);
+        terrainVAO.bind();
+        glDrawElements(GL_TRIANGLE_STRIP, indices.size(), GL_UNSIGNED_INT, 0);
+        //for (unsigned int strip = 0; strip < NUM_STRIPS; ++strip) {
+        //    glDrawElements(GL_TRIANGLE_STRIP, NUM_VERTS_PER_STRIP, GL_UNSIGNED_INT, 
+        //        (void*) (sizeof(unsigned int) * strip * NUM_VERTS_PER_STRIP));
+        //}
+
+        // debug texture
+        //screenShader.use();
+        //brdfLUT.activate(screenShader, "screenTexture", 0);
+        //screen.Draw();
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Terminate
+    glfwTerminate();
+    return 0;
+}
+
+
 int main(void)
 {
     switch (23)
@@ -5527,6 +5729,7 @@ int main(void)
     case 21: return pbr_texture_scene(); break;
     case 22: return ibl_scene(); break;
     case 23: return ssr_scene(); break;
+    case 24: return terrain_scene(); break;
     }
 }
 

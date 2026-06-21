@@ -10,6 +10,11 @@ public:
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, size, indices, GL_STATIC_DRAW);
 	}
+	EBO(std::vector<int> indices) {
+		glGenBuffers(1, &id);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW);
+	}
 	inline void bind() const { glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, id); }
 	inline void unbind() const { glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); }
 	void Delete() { glDeleteBuffers(1, &id); }

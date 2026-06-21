@@ -17,7 +17,7 @@ uniform mat3 normalView;
 
 uniform int maxIter;
 uniform int maxLod = 0;
-const float maxDepth = 100.0;
+//const float maxDepth = 100.0;
 
 struct ScreenRay
 {
@@ -31,6 +31,12 @@ struct ScreenRay
 
 ScreenRay setupRay(vec3 viewPos, vec3 R){
 	ScreenRay ray;
+	
+	float maxDepth = 50.0;
+	if (R.z >= 0.0){
+		maxDepth = min(maxDepth, (-viewPos.z - 1.01 * near) / R.z);
+	}
+
 	ivec2 texSize = textureSize(gDepth, 0);
 	vec3 viewStart = viewPos;									// view space
 	vec4 clipStart = projection * vec4(viewStart, 1.0);			// clip space
@@ -82,12 +88,12 @@ void main()
 		FragColor = vec4(0.2, 0.2, 0.2, 1.0);		// Grey: No geometry
 		return;
 	}
-
-	if (R.z >= 0.0){
-		FragColor = vec4(1.0, 0.0, 0.0, 1.0);		// Red: backwards ray
-		return;
-	}
-
+	//TODO: Backwards rays can also hit valid geometry, so no need to end early, 
+	// however, we have to be careful of the ray.dir
+	//if (R.z >= 0.0 && abs(R.x) <0.0000001 && abs(R.y) <0.0000001 ){
+	//	FragColor = vec4(1.0, 0.0, 0.0, 1.0);		// Red: backwards ray
+	//	return;
+	//}
 	vec3 viewPos = getViewPos(); 
 	ScreenRay ray = setupRay(viewPos, R);
 	ivec2 texSize = textureSize(gDepth, 0);
@@ -99,9 +105,12 @@ void main()
 	bool LR = abs(ray.dir.x) >= abs(ray.dir.y);
 	bool UD = !LR;
 	currentPix += ray.next * ivec2(LR, UD); 
+	if (currentPix.x < 0 || currentPix.y < 0 || currentPix.x >= texSize.x || currentPix.y >= texSize.y) {
+        return; 
+    }
 	
 	// Ray life
-	while (iter < maxIter && t<1.0)
+	while (iter < maxIter && t <= 1.0)
 	{
 		++iter;
 		float t_old = t;
@@ -110,8 +119,22 @@ void main()
 		float tx = (boundaries.x - ray.start.x) * ray.invDir.x;
 		float ty = (boundaries.y - ray.start.y) * ray.invDir.y;
 		t = min(tx, ty);
+		//if (t > 1.0){
+		//	if (lod == 0){
+		//		break;
+		//	}
+		//	else {
+		//		t = t_old;
+		//		--lod;
+		//		currentPix = currentPix << 1;
+		//		bool shiftRight = (ray.start.x + t * ray.dir.x) >= float((currentPix.x + 1) << lod);
+		//		bool shiftUp = (ray.start.y + t * ray.dir.y) >= float((currentPix.y + 1) << lod);
+		//		currentPix += ivec2(shiftRight, shiftUp);
+		//	}
+		//}
 		float rayDepth = ray.zStart + t * ray.zDelta;
 		float texDepth = texelFetch(gDepth, currentPix, lod).r;
+		
 		if (rayDepth < texDepth) {
 			// step
 			bool LR = tx < ty;
@@ -152,9 +175,11 @@ void main()
 		}
 		else if (lod == 0) {
 			// hit
+			float linRayDepth = linDepth(rayDepth);
 			float linRayDepthOld = linDepth(ray.zStart + t_old * ray.zDelta);
 			float linTexDepth = linDepth(texDepth);
-			if (linRayDepthOld < linTexDepth * 1.005){
+			float tolerance = linTexDepth * 0.005 + abs(linRayDepth - linRayDepthOld);
+			if (linRayDepth <= linTexDepth + tolerance){
 				FragColor = texelFetch(gColor, currentPix, 0);
 			}
 			else {
@@ -173,5 +198,5 @@ void main()
 		}
 	}
 	if (iter == maxIter) {FragColor = vec4(0.0, 1.0, 1.0, 1.0);}  // Cyan: iteration time-out
-	if (t >= 1.0) {FragColor = vec4(0.0, 1.0, 0.0, 1.0);}  // Cyan: t exceeds max depth
+	if (t >= 1.0) {FragColor = vec4(0.0, 1.0, 0.0, 1.0);}  // Green: t exceeds max depth
 }
