@@ -1016,7 +1016,7 @@ int geom_shader_scene() {
     pointVAO.unbind();
 
     // Shader
-    Shader shader("../../../src/shaders/geotest.vert", "../../../src/shaders/geotest.geom", "../../../src/shaders/geotest.frag");
+    Shader shader("../../../src/shaders/geotest.vert", "../../../src/shaders/geotest.frag", "../../../src/shaders/geotest.geom");
 
     // Model
     //Model ourModel("../../../src/models/backpack/backpack.obj");
@@ -1121,7 +1121,7 @@ int norm_vect_scene() {
 
     // Shaders
     Shader simpleShader("../../../src/shaders/simple.vert", "../../../src/shaders/simple.frag");
-    Shader normalShader("../../../src/shaders/normals.vert", "../../../src/shaders/normals.geom", "../../../src/shaders/solid.frag");
+    Shader normalShader("../../../src/shaders/normals.vert", "../../../src/shaders/solid.frag", "../../../src/shaders/normals.geom");
 
     // Setup const shader uniforms
     simpleShader.use();
@@ -2620,7 +2620,7 @@ int point_shadow_scene() {
 
     // Shaders
     Shader ourShader("../../../src/shaders/bp_omni_shadow.vert", "../../../src/shaders/bp_omni_shadow.frag");
-    Shader shadowShader("../../../src/shaders/point_shadow.vert", "../../../src/shaders/point_shadow.geom", "../../../src/shaders/point_shadow.frag");
+    Shader shadowShader("../../../src/shaders/point_shadow.vert", "../../../src/shaders/point_shadow.frag", "../../../src/shaders/point_shadow.geom");
     Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
 
     // Load textures
@@ -2866,7 +2866,7 @@ int normal_map_scene() {
     // Shaders
     Shader ourShader("../../../src/shaders/normal_mapping.vert", "../../../src/shaders/normal_mapping.frag");
     Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
-    Shader tbnShader("../../../src/shaders/tbn_visualiser.vert", "../../../src/shaders/tbn_visualiser.geom", "../../../src/shaders/tbn_visualiser.frag");
+    Shader tbnShader("../../../src/shaders/tbn_visualiser.vert", "../../../src/shaders/tbn_visualiser.frag", "../../../src/shaders/tbn_visualiser.geom");
 
     // Load textures
     Texture brick = Texture("../../../src/textures/brickwall.jpg", gamma_correct, false);
@@ -3041,7 +3041,7 @@ int parallax_map_scene() {
     // Shaders
     Shader ourShader("../../../src/shaders/normal_mapping.vert", "../../../src/shaders/parallax.frag");
     Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
-    Shader tbnShader("../../../src/shaders/tbn_visualiser.vert", "../../../src/shaders/tbn_visualiser.geom", "../../../src/shaders/tbn_visualiser.frag");
+    Shader tbnShader("../../../src/shaders/tbn_visualiser.vert", "../../../src/shaders/tbn_visualiser.frag", "../../../src/shaders/tbn_visualiser.geom");
 
     // Load textures
     
@@ -5700,10 +5700,197 @@ int terrain_scene() {
     return 0;
 }
 
+int tesselation_scene() {
+    // Variable setup
+    const unsigned int MS_SAMPLES = 1;
+    float gamma = 2.2;      // best to use 2.2
+    bool manual_gamma = true;
+    bool gamma_correct = (gamma != 1.0);
+
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, MS_SAMPLES);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+    int fbWidth, fbHeight;
+    glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+
+    // OGL state setup --------------------------------------------------
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    //glEnable(GL_BLEND);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    if (MS_SAMPLES > 1) glEnable(GL_MULTISAMPLE);
+
+    if (gamma_correct && !manual_gamma) glEnable(GL_FRAMEBUFFER_SRGB);
+
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+    const unsigned int RESTART_INDEX = 0xFFFFFFFF;
+    glEnable(GL_PRIMITIVE_RESTART);
+    glPrimitiveRestartIndex(RESTART_INDEX);
+
+    glPatchParameteri(GL_PATCH_VERTICES, 4);
+
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+
+    // Setup geometry, textures, buffers and shaders --------------------
+    // Vertices
+
+    // Shaders
+    Shader simpleShader("../../../src/shaders/height.vert", "../../../src/shaders/height.frag");
+	Shader tessellationHeightShader("../../../src/shaders/tessellation.vert", "../../../src/shaders/height.frag",
+        nullptr, "../../../src/shaders/tessellation.tesc", "../../../src/shaders/tessellation.tese");
+    Shader ppfxShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
+    Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/screen.frag");
+
+
+    // Load textures
+    Texture heightmap("../../../src/textures/iceland_heightmap.png", false);
+
+    // Models & meshes
+    int width, height, nChannels;
+    stbi_set_flip_vertically_on_load(true);
+    unsigned char* data = stbi_load("../../../src/textures/iceland_heightmap.png",
+        &width, &height, &nChannels,
+        0);
+    ScreenQuad screen = ScreenQuad();
+    std::vector<float> vertices;
+    static unsigned int rez = 20;
+    for (unsigned i = 0; i <= rez - 1; i++)
+    {
+        for (unsigned j = 0; j <= rez - 1; j++)
+        {
+            // 0: Bottom-Left
+            vertices.push_back(-width / 2.0f + width * i / (float)rez);         // x
+            vertices.push_back(0.0f);                                           // y
+            vertices.push_back(-height / 2.0f + height * (j + 1) / (float)rez); // z (+Z = forward/south)
+            vertices.push_back(i / (float)rez);                                 // u
+            vertices.push_back((j + 1) / (float)rez);                           // v
+
+            // 1: Bottom-Right
+            vertices.push_back(-width / 2.0f + width * (i + 1) / (float)rez);   // x
+            vertices.push_back(0.0f);                                           // y
+            vertices.push_back(-height / 2.0f + height * (j + 1) / (float)rez); // z
+            vertices.push_back((i + 1) / (float)rez);                           // u
+            vertices.push_back((j + 1) / (float)rez);                           // v
+
+            // 2: Top-Right
+            vertices.push_back(-width / 2.0f + width * (i + 1) / (float)rez);   // x
+            vertices.push_back(0.0f);                                           // y
+            vertices.push_back(-height / 2.0f + height * j / (float)rez);       // z (-Z = back/north)
+            vertices.push_back((i + 1) / (float)rez);                           // u
+            vertices.push_back(j / (float)rez);                                 // v
+
+            // 3: Top-Left
+            vertices.push_back(-width / 2.0f + width * i / (float)rez);         // x
+            vertices.push_back(0.0f);                                           // y
+            vertices.push_back(-height / 2.0f + height * j / (float)rez);       // z
+            vertices.push_back(i / (float)rez);                                 // u
+            vertices.push_back(j / (float)rez);                                 // v
+        }
+    }
+
+    VAO terrainVAO = VAO();
+    terrainVAO.bind();
+    VBO terrainVBO = VBO(vertices);
+    terrainVAO.linkVBO(terrainVBO);
+    terrainVAO.setAttributes(3, 0, 2, 0);
+    terrainVAO.unbind();
+
+    // Lights
+
+    // Render object setup
+    PPO ppo = PPO(screenShader, SCR_WIDTH, SCR_HEIGHT);
+
+    // shader setup
+
+    // Background
+    float clear_color[] = { pow(0.1, gamma), pow(0.1, gamma), pow(0.1, gamma), 1.0 };
+
+	// switching variable for testing purposes
+    bool toggle_old = toggle;
+    int caseNr = 0;
+
+    // Main render loop ---------------------------------------------------
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 10000.0f);
+        glm::mat4 model = glm::mat4(1.0f);
+        tessellationHeightShader.use();
+        tessellationHeightShader.setMat4("model", model);
+        tessellationHeightShader.setMat4("view", view);
+        tessellationHeightShader.setMat4("projection", projection);
+		heightmap.activate(tessellationHeightShader, "heightmap", 0);
+        terrainVAO.bind();
+		glDrawArrays(GL_PATCHES, 0, 4*rez*rez);
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Terminate
+    glfwTerminate();
+    return 0;
+}
+
 
 int main(void)
 {
-    switch (23)
+    switch (25)
     {
     case 0:  return base_scene(); break;
     case 1:  return main_scene(); break;
@@ -5730,6 +5917,7 @@ int main(void)
     case 22: return ibl_scene(); break;
     case 23: return ssr_scene(); break;
     case 24: return terrain_scene(); break;
+    case 25: return tesselation_scene(); break;
     }
 }
 
