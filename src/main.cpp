@@ -5954,7 +5954,7 @@ int noise_scene() {
 
     if (gamma_correct && !manual_gamma) glEnable(GL_FRAMEBUFFER_SRGB);
 
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     const unsigned int RESTART_INDEX = 0xFFFFFFFF;
     glEnable(GL_PRIMITIVE_RESTART);
@@ -5969,12 +5969,12 @@ int noise_scene() {
     Shader simpleShader("../../../src/shaders/terrain.vert", "../../../src/shaders/height.frag");
     Shader ppfxShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
     Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/overexposure.frag");
-
+    Shader perlinShader("../../../src/shaders/screen.vert", "../../../src/shaders/perlin.frag");
 
     // Load textures
     // Texture heightmap("../../../src/textures/iceland_heightmap.png", false);
-    int width = 2048;
-    int height = 2048;
+    int width = 512;
+    int height = 512;
     ValueNoiseTexture valueNoise = ValueNoiseTexture(width, height, 10);
 	std::vector<int> octaves = {4, 8, 16, 32, 64, 128, 256, 512};
 	std::vector<float> powers = { 1.0, 0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625, 0.0078125 };
@@ -6064,6 +6064,10 @@ int noise_scene() {
         //screenShader.use();
         //noise2.activate(screenShader, "screenTexture", 0);
         //screen.Draw();
+        perlinShader.use();
+        perlinShader.setVec2("resolution", glm::vec2(SCR_WIDTH, SCR_HEIGHT));
+        perlinShader.setInt("scale", 10);
+        screen.Draw();
 
         // Swap buffers and poll for IO events
         glfwSwapBuffers(window);
