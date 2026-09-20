@@ -19,9 +19,9 @@ void main()
         // Step 1: define constants to control tessellation parameters
 	    // set these as desired for your world scale
         const int MIN_TESS_LEVEL = 4;
-        const int MAX_TESS_LEVEL = 64;
-        const float MIN_DISTANCE = 2;
-        const float MAX_DISTANCE = 2000;
+        const int MAX_TESS_LEVEL = 32;
+        const float MIN_DISTANCE = 10;
+        const float MAX_DISTANCE = 1000;
 
         // Step 2: transform vertex position to view space
         vec4 viewPos00 = view * model * gl_in[0].gl_Position;   //BL

@@ -10,7 +10,9 @@
 #include <vector>
 #include <map>
 #include <random>
+#include <chrono>
 
+#include "helpers.h"
 #include "vbo.h"
 #include "ebo.h"
 #include "vao.h"
@@ -33,7 +35,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
-float lerp(float a, float b, float f);
+//float lerp(float a, float b, float f);
 
 // settings
 const unsigned int SCR_WIDTH = 2560;
@@ -5887,10 +5889,196 @@ int tesselation_scene() {
     return 0;
 }
 
+int noise_scene() {
+    // Variable setup
+    const unsigned int MS_SAMPLES = 1;
+    float gamma = 2.2;      // best to use 2.2
+    bool manual_gamma = true;
+    bool gamma_correct = (gamma != 1.0);
+
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, MS_SAMPLES);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+    int fbWidth, fbHeight;
+    glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+
+    // OGL state setup --------------------------------------------------
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    //glEnable(GL_BLEND);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    if (MS_SAMPLES > 1) glEnable(GL_MULTISAMPLE);
+
+    if (gamma_correct && !manual_gamma) glEnable(GL_FRAMEBUFFER_SRGB);
+
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+    const unsigned int RESTART_INDEX = 0xFFFFFFFF;
+    glEnable(GL_PRIMITIVE_RESTART);
+    glPrimitiveRestartIndex(RESTART_INDEX);
+
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+
+    // Setup geometry, textures, buffers and shaders --------------------
+    // Vertices
+
+    // Shaders
+    Shader simpleShader("../../../src/shaders/terrain.vert", "../../../src/shaders/height.frag");
+    Shader ppfxShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
+    Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/overexposure.frag");
+
+
+    // Load textures
+    // Texture heightmap("../../../src/textures/iceland_heightmap.png", false);
+    int width = 2048;
+    int height = 2048;
+    ValueNoiseTexture valueNoise = ValueNoiseTexture(width, height, 10);
+	std::vector<int> octaves = {4, 8, 16, 32, 64, 128, 256, 512};
+	std::vector<float> powers = { 1.0, 0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625, 0.0078125 };
+    ValueNoiseTexture valueNoiseOctave = ValueNoiseTexture(width, height, octaves, powers);
+    PerlinNoiseTexture perlinNoise = PerlinNoiseTexture(width, height, 10);
+    PerlinNoiseTexture perlinNoiseOctave = PerlinNoiseTexture(width, height, octaves, powers);
+
+    // Models & meshes
+    ScreenQuad screen = ScreenQuad();
+
+    std::vector<float> vertices;
+    for (unsigned int i = 0; i < height; i++)
+    {
+        for (unsigned int j = 0; j < width; j++)
+        {
+
+            vertices.push_back(-height / 2.0f + i); //x
+            vertices.push_back(0.0); //y
+            vertices.push_back(-width / 2.0f + j); //z
+			vertices.push_back((float)j / (float)width); //u
+			vertices.push_back((float)i / (float)height); //v
+        }
+    }
+
+    const unsigned int NUM_STRIPS = height - 1;
+    const unsigned int NUM_VERTS_PER_STRIP = width * 2;
+    std::vector<int> indices;
+
+
+    for (unsigned int i = 0; i < height - 1; ++i) {
+        for (unsigned int j = 0; j < width; ++j) {
+            indices.push_back(j + width * i + width);
+            indices.push_back(j + width * i);
+        }
+        indices.push_back(RESTART_INDEX);
+    }
+
+    VAO terrainVAO = VAO();
+    terrainVAO.bind();
+    VBO terrainVBO = VBO(vertices);
+    terrainVAO.linkVBO(terrainVBO);
+    EBO terrainEBO = EBO(indices);
+    terrainVAO.linkEBO(terrainEBO);
+    terrainVAO.setAttributes(3, 0, 2, 0);
+    terrainVAO.unbind();
+
+    // Lights
+
+    // Render object setup
+    PPO ppo = PPO(screenShader, SCR_WIDTH, SCR_HEIGHT);
+
+    // shader setup
+
+    // Background
+    float clear_color[] = { pow(0.1, gamma), pow(0.1, gamma), pow(0.1, gamma), 1.0 };
+
+
+    bool toggle_old = toggle;
+    int caseNr = 0;
+
+    // Main render loop ---------------------------------------------------
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 10000.0f);
+        glm::mat4 model = glm::mat4(1.0f);
+        simpleShader.use();
+        simpleShader.setMat4("model", model);
+        simpleShader.setMat4("view", view);
+        simpleShader.setMat4("projection", projection);
+		perlinNoiseOctave.activate(simpleShader, "heightmap", 0);
+        terrainVAO.bind();
+        glDrawElements(GL_TRIANGLE_STRIP, indices.size(), GL_UNSIGNED_INT, 0);
+
+        // debug texture
+        //screenShader.use();
+        //noise2.activate(screenShader, "screenTexture", 0);
+        //screen.Draw();
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Terminate
+    glfwTerminate();
+    return 0;
+}
+
+
 
 int main(void)
 {
-    switch (25)
+    switch (26)
     {
     case 0:  return base_scene(); break;
     case 1:  return main_scene(); break;
@@ -5918,6 +6106,7 @@ int main(void)
     case 23: return ssr_scene(); break;
     case 24: return terrain_scene(); break;
     case 25: return tesselation_scene(); break;
+    case 26: return noise_scene(); break;
     }
 }
 
@@ -6047,8 +6236,4 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
     camera.ProcessMouseScroll(static_cast<float>(yoffset));
-}
-
-float lerp(float a, float b, float f) {
-    return a + (b - a) * f;
 }

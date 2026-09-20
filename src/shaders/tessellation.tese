@@ -1,6 +1,6 @@
 #version 410 core
 
-layout (quads, fractional_odd_spacing, ccw) in;
+layout (quads, fractional_even_spacing, ccw) in;
 
 uniform sampler2D heightMap;
 uniform mat4 model;
@@ -57,8 +57,7 @@ void main()	{
 	float u = gl_TessCoord.x;
     float v = gl_TessCoord.y;
 
-    // --- CORNER MAPPING ---
-    // 0: BL, 1: BR, 2: TR, 3: TL
+    // get texcoords and positions of the four corners of the patch
     vec2 t00 = TessTexCoord[0]; // BL
     vec2 t10 = TessTexCoord[1]; // BR
     vec2 t11 = TessTexCoord[2]; // TR
@@ -69,7 +68,7 @@ void main()	{
     vec4 p11 = gl_in[2].gl_Position; // TR
     vec4 p01 = gl_in[3].gl_Position; // TL
 
-    // --- BILINEAR INTERPOLATION ---
+    // bilinear interpolation of texture coordinates and positions across the patch
     vec2 t0 = mix(t00, t10, u); // Bottom edge (BL -> BR)
     vec2 t1 = mix(t01, t11, u); // Top edge    (TL -> TR)
     vec2 texCoord = mix(t0, t1, v);
@@ -78,7 +77,7 @@ void main()	{
     vec4 p1 = mix(p01, p11, u);
     vec4 position = mix(p0, p1, v);
 
-    // --- HEIGHT MAP DISPLACEMENT ---
+    // sample the height from the height map and scale and offset it to the desired range
     Height = texture(heightMap, texCoord).r * 64.0 - 16.0;
 
     // --- NORMAL & WINDING ALIGNMENT ---

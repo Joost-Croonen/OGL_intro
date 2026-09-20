@@ -476,4 +476,164 @@ public:
     }
 };
 
+
+
+
+class ValueNoiseTexture : public Texture
+{
+public:
+    ValueNoiseTexture(unsigned int width, unsigned int height, int scale) :
+        Texture(width, height, GL_RGB16F, 1, GL_LINEAR, GL_LINEAR, GL_REPEAT, GL_REPEAT, DEFAULT_BORDER_COLOR)
+    {
+        int num_cells = scale;
+        std::vector<glm::vec3> noiseData(width * height);
+        std::vector<float> rand_grid = value_noise_grid(num_cells);
+        for (unsigned int y = 0; y < height; ++y) {
+            for (unsigned int x = 0; x < width; ++x) {
+                float nx = (float)x / (float)width;
+                float ny = (float)y / (float)height;
+                float noise = value_noise(nx, ny, num_cells, rand_grid);
+                noiseData[y * width + x] = glm::vec3(noise);
+            }
+        }
+        glBindTexture(GL_TEXTURE_2D, id);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGB, GL_FLOAT, noiseData.data());
+    }
+
+    ValueNoiseTexture(unsigned int width, unsigned int height, std::vector<int> octaves, std::vector<float> powers) :
+        Texture(width, height, GL_RGB16F, 1, GL_LINEAR, GL_LINEAR, GL_REPEAT, GL_REPEAT, DEFAULT_BORDER_COLOR)
+    {
+        std::vector<glm::vec3> noiseData(width * height, glm::vec3(0.0));
+        for (int i = 0; i < octaves.size(); ++i) {
+            int num_cells = octaves[i];
+			float power = powers[i];
+            std::vector<float> rand_grid = value_noise_grid(num_cells);
+            for (unsigned int y = 0; y < height; ++y) {
+                for (unsigned int x = 0; x < width; ++x) {
+                    float nx = (float)x / (float)width;
+                    float ny = (float)y / (float)height;
+					float noise = value_noise(nx, ny, num_cells, rand_grid);
+                    noiseData[y * width + x] += glm::vec3(power * noise);
+                }
+            }
+        }
+        glBindTexture(GL_TEXTURE_2D, id);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGB, GL_FLOAT, noiseData.data());
+    }
+
+    float value_noise(float x, float y, int num_cells, const std::vector<float>& rand_vectors)
+    {
+        int ix0 = static_cast<int>(x * num_cells) % num_cells;
+        int iy0 = static_cast<int>(y * num_cells) % num_cells;
+        int ix1 = (ix0 + 1) % num_cells;
+        int iy1 = (iy0 + 1) % num_cells;
+        float dx = x * num_cells - static_cast<float>(ix0);
+        float dy = y * num_cells - static_cast<float>(iy0);
+        float s00 = rand_vectors[iy0 * num_cells + ix0];  
+		float s10 = rand_vectors[iy0 * num_cells + ix1];
+		float s01 = rand_vectors[iy1 * num_cells + ix0];
+		float s11 = rand_vectors[iy1 * num_cells + ix1];
+        return smootherlerp(smootherlerp(s00, s10, dx), smootherlerp(s01, s11, dx), dy);
+    }
+
+    std::vector<float> value_noise_grid(int num_points)
+    {
+        std::vector<float> rand_vectors(num_points * num_points);
+        for (int i = 0; i < num_points * num_points; ++i) {
+            rand_vectors[i] = random();
+        }
+		return rand_vectors;
+    }
+};
+
+
+
+class PerlinNoiseTexture : public Texture
+{
+public:
+    PerlinNoiseTexture(unsigned int width, unsigned int height, int scale) :
+        Texture(width, height, GL_RGB16F, 1, GL_LINEAR, GL_LINEAR, GL_REPEAT, GL_REPEAT, DEFAULT_BORDER_COLOR)
+    {
+        int num_cells = scale;
+        std::vector<glm::vec3> noiseData(width * height);
+        std::vector<glm::vec2> rand_grid = perlin_noise_grid(num_cells);
+        for (unsigned int y = 0; y < height; ++y) {
+            for (unsigned int x = 0; x < width; ++x) {
+                float nx = (float)x / (float)width;
+                float ny = (float)y / (float)height;
+                float noise = perlin_noise(nx, ny, num_cells, rand_grid);
+                noiseData[y * width + x] = glm::vec3(noise);
+            }
+        }
+        for (auto& v : noiseData) {
+            v *= 0.5f;
+            v += 0.5f;
+        }
+        glBindTexture(GL_TEXTURE_2D, id);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGB, GL_FLOAT, noiseData.data());
+    }
+
+    PerlinNoiseTexture(unsigned int width, unsigned int height, std::vector<int> octaves, std::vector<float> powers) :
+        Texture(width, height, GL_RGB16F, 1, GL_LINEAR, GL_LINEAR, GL_REPEAT, GL_REPEAT, DEFAULT_BORDER_COLOR)
+    {
+        std::vector<glm::vec3> noiseData(width * height, glm::vec3(0.0));
+        for (int i = 0; i < octaves.size(); ++i) {
+            int num_cells = octaves[i];
+            float power = powers[i];
+            std::vector<glm::vec2> rand_grid = perlin_noise_grid(num_cells);
+            for (unsigned int y = 0; y < height; ++y) {
+                for (unsigned int x = 0; x < width; ++x) {
+                    float nx = (float)x / (float)width;
+                    float ny = (float)y / (float)height;
+                    float noise = perlin_noise(nx, ny, num_cells, rand_grid);
+                    noiseData[y * width + x] += glm::vec3(power * noise);
+                }
+            }
+        }
+        for (auto& v : noiseData) {
+			v *= 0.5f;
+			v += 0.5f;
+        }
+        glBindTexture(GL_TEXTURE_2D, id);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGB, GL_FLOAT, noiseData.data());
+    }
+
+    float perlin_noise(float x, float y, int num_cells, const std::vector<glm::vec2>& rand_vectors)
+    {
+        int ix0 = static_cast<int>(x * num_cells) % num_cells;
+        int iy0 = static_cast<int>(y * num_cells) % num_cells;
+		int ix1 = (ix0 + 1) % num_cells;
+		int iy1 = (iy0 + 1) % num_cells;
+        float dx = x * num_cells - static_cast<float>(ix0);
+        float dy = y * num_cells - static_cast<float>(iy0);
+        glm::vec2 d00 = -glm::vec2(dx, dy);
+        glm::vec2 d10 = -glm::vec2(dx - 1.0f, dy);
+        glm::vec2 d01 = -glm::vec2(dx, dy - 1.0f);
+        glm::vec2 d11 = -glm::vec2(dx - 1.0f, dy - 1.0f);
+        float s00 = glm::dot(rand_vectors[iy0 * num_cells + ix0], d00);
+        float s10 = glm::dot(rand_vectors[iy0 * num_cells + ix1], d10);
+        float s01 = glm::dot(rand_vectors[iy1 * num_cells + ix0], d01);
+        float s11 = glm::dot(rand_vectors[iy1 * num_cells + ix1], d11);
+        return smootherlerp(smootherlerp(s00, s10, dx), smootherlerp(s01, s11, dx), dy);
+    }
+
+    std::vector<glm::vec2> perlin_noise_grid(int num_points)
+    {
+        std::vector<glm::vec2> rand_vectors(num_points * num_points);
+        for (int i = 0; i < num_points * num_points; ++i) {
+            rand_vectors[i] = rand_direction();
+        }
+        return rand_vectors;
+    }
+
+    glm::vec2 rand_direction() {
+        float angle = random() * 2.0f * 3.14159265358979323846f;
+        return glm::vec2(cos(angle), sin(angle));
+    }
+};
+
+
+
+
+
 #endif
