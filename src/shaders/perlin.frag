@@ -3,7 +3,8 @@
 out vec4 FragColor;
 
 uniform vec2 resolution;
-uniform int scale; 
+uniform int frequency; 
+uniform float amplitude;
 
 const vec2 v00 = vec2(0.0, 0.0);
 const vec2 v10 = vec2(1.0, 0.0);
@@ -60,11 +61,93 @@ float perlin(vec2 p){
     return mix( mix(s00, s10, t.x), mix(s01, s11, t.x), t.y);
 }
 
+vec3 perlin_gradient(vec2 uv, float F){
+    vec2 p = uv * F;
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+
+    vec2 b = f * f * f * (f * (f * 6.0f - 15.0f) + 10.0f);
+    vec2 db = 30.0 * f * f * (f * (f - 2.0) + 1.0);
+
+    vec2 g00 = rand_direction(i + v00);
+    vec2 g10 = rand_direction(i + v10);
+    vec2 g01 = rand_direction(i + v01);
+    vec2 g11 = rand_direction(i + v11);
+
+    float s00 = dot(g00, f-v00);
+    float s10 = dot(g10, f-v10);
+    float s01 = dot(g01, f-v01);
+    float s11 = dot(g11, f-v11);
+
+    float A = mix(s00, s10, b.s);
+    float B = mix(s01, s11, b.s);
+
+    float H = mix(A, B, b.t);
+
+    float dAds = db.s * (s10 - s00) + mix(g00.x, g10.x, b.s);
+    float dBds = db.s * (s11 - s01) + mix(g01.x, g11.x, b.s);
+    float dHds = mix(dAds, dBds, b.t);
+
+    float dAdt = mix(g00.t, g10.t, b.s);
+    float dBdt = mix(g01.t, g11.t, b.s);
+    float dHdt = db.t * (B - A) + mix(dAdt, dBdt, b.t);
+
+    float aspect = resolution.x / resolution.y;
+    float dHdx = F * dHds * aspect;
+    float dHdz = F * dHdt;
+
+    return vec3(H, dHdx, dHdz);
+}
+
+vec3 perlin_gradient_tiling(vec2 uv, float F, int seed=0){
+    vec2 p = uv * F;
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+
+    vec2 b = f * f * f * (f * (f * 6.0f - 15.0f) + 10.0f);
+    vec2 db = 30.0 * f * f * (f * (f - 2.0) + 1.0);
+
+    vec2 i00 = mod(i + v00, F);
+    vec2 i10 = mod(i + v10, F);
+    vec2 i01 = mod(i + v01, F);
+    vec2 i11 = mod(i + v11, F);
+
+    vec2 g00 = rand_direction(i00 + ivec2(seed, 1311*seed));
+    vec2 g10 = rand_direction(i10 + ivec2(seed, 1311*seed));
+    vec2 g01 = rand_direction(i01 + ivec2(seed, 1311*seed));
+    vec2 g11 = rand_direction(i11 + ivec2(seed, 1311*seed));
+
+    float s00 = dot(g00, f-v00);
+    float s10 = dot(g10, f-v10);
+    float s01 = dot(g01, f-v01);
+    float s11 = dot(g11, f-v11);
+
+    float A = mix(s00, s10, b.s);
+    float B = mix(s01, s11, b.s);
+
+    float H = mix(A, B, b.t);
+
+    float dAds = db.s * (s10 - s00) + mix(g00.x, g10.x, b.s);
+    float dBds = db.s * (s11 - s01) + mix(g01.x, g11.x, b.s);
+    float dHds = mix(dAds, dBds, b.t);
+
+    float dAdt = mix(g00.t, g10.t, b.s);
+    float dBdt = mix(g01.t, g11.t, b.s);
+    float dHdt = db.t * (B - A) + mix(dAdt, dBdt, b.t);
+
+    float aspect = resolution.x / resolution.y;
+    float dHdx = frequency * dHds * aspect;
+    float dHdz = frequency * dHdt;
+
+    return vec3(H, dHdx, dHdz);
+}
+
 void main(){
-    vec2 p = gl_FragCoord.xy / resolution.xy;
-    p.x *= resolution.x/resolution.y;
-    p *= scale;
-    float noise = perlin(p);
-    vec3 color = vec3(noise * 0.5 + 0.5);
-    FragColor = vec4(color, 1.0);
+    vec2 uv = gl_FragCoord.xy / resolution.xy;
+    float aspect = resolution.x/resolution.y;
+    uv.x *= aspect;
+    vec3 noise = perlin_gradient_tiling(uv, frequency, 0);
+    //vec3 scaled = amplitude * vec3(noise.x * 0.5 + 0.5, noise.y * 0.5, noise.z * 0.5);
+    //FragColor = vec4(scaled, 1.0);
+    FragColor = vec4(amplitude * noise, 1.0);
 }

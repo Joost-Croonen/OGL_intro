@@ -129,8 +129,8 @@ vec2 refined_parallax(vec3 viewDir, vec2 startCoords)
 
 vec2 binary_parallax(vec3 viewDir, vec2 startCoords)
 {
-    const float minLayers = 2;
-    const float maxLayers = 32;
+    const int minLayers = 2;
+    const int maxLayers = 32;
     float numLayers = mix(maxLayers, minLayers, abs(dot(vec3(0.0, 0.0, 1.0), viewDir)));
     //numLayers = 28;
     float layerDepth = 1.0 / numLayers;
@@ -254,7 +254,7 @@ vec4 calc_light(int index)
     // specular
     vec3 halfVec = normalize(lightDir + viewDir);
     vec3 specular = pow(max(dot(norm, halfVec), 0.0), material.shininess) * diffuseColor;
-    // self shadow
+    // self shadow ( shadow is the same as parallax, but from the lightsource pov)
     float texDepth = 1.0 - texture(material.texture_height1, parallaxCoords).r;
     vec2 lightIntersect = parallaxCoords + lightDir.xy * height_scale * texDepth;
     vec2 shadowCoords = binary_parallax(lightDir, lightIntersect);

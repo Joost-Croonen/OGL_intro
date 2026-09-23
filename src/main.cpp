@@ -56,10 +56,13 @@ bool ssaoFlag = false;
 bool ssao_key = false;
 bool toggle = false;
 bool toggle_key = false;
+float sun_elevation = 45.0;
+float sun_orientation = 0.0;
 
 // camera
 //Camera camera(glm::vec3(1.0f, 1.5f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -100, -20);
-Camera camera(glm::vec3(1.0f, 7.0f, 16.0f), glm::vec3(0.0f, 1.0f, 0.0f), -120, -20);
+//Camera camera(glm::vec3(1.0f, 7.0f, 16.0f), glm::vec3(0.0f, 1.0f, 0.0f), -120, -20);
+Camera camera(glm::vec3(0.0f, 750.0f, 1500.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90, -35);
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -5681,6 +5684,7 @@ int terrain_scene() {
         simpleShader.setMat4("model", model);
         simpleShader.setMat4("view", view);
         simpleShader.setMat4("projection", projection);
+        simpleShader.setFloat("heightScale", 32.0f);
         terrainVAO.bind();
         glDrawElements(GL_TRIANGLE_STRIP, indices.size(), GL_UNSIGNED_INT, 0);
         //for (unsigned int strip = 0; strip < NUM_STRIPS; ++strip) {
@@ -5876,6 +5880,7 @@ int tesselation_scene() {
         tessellationHeightShader.setMat4("model", model);
         tessellationHeightShader.setMat4("view", view);
         tessellationHeightShader.setMat4("projection", projection);
+        tessellationHeightShader.setFloat("heightScale", 32.0f);
 		heightmap.activate(tessellationHeightShader, "heightmap", 0);
         terrainVAO.bind();
 		glDrawArrays(GL_PATCHES, 0, 4*rez*rez);
@@ -5966,36 +5971,41 @@ int noise_scene() {
     // Vertices
 
     // Shaders
-    Shader simpleShader("../../../src/shaders/terrain.vert", "../../../src/shaders/height.frag");
+    Shader terrainShader("../../../src/shaders/terrain.vert", "../../../src/shaders/terrain.frag");
+    Shader terrainHeightShader("../../../src/shaders/terrain.vert", "../../../src/shaders/height.frag");
     Shader ppfxShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
     Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/overexposure.frag");
     Shader perlinShader("../../../src/shaders/screen.vert", "../../../src/shaders/perlin.frag");
+    Shader mixShader("../../../src/shaders/screen.vert", "../../../src/shaders/mix.frag");
 
     // Load textures
     // Texture heightmap("../../../src/textures/iceland_heightmap.png", false);
-    int width = 512;
-    int height = 512;
-    ValueNoiseTexture valueNoise = ValueNoiseTexture(width, height, 10);
-	std::vector<int> octaves = {4, 8, 16, 32, 64, 128, 256, 512};
-	std::vector<float> powers = { 1.0, 0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625, 0.0078125 };
-    ValueNoiseTexture valueNoiseOctave = ValueNoiseTexture(width, height, octaves, powers);
-    PerlinNoiseTexture perlinNoise = PerlinNoiseTexture(width, height, 10);
-    PerlinNoiseTexture perlinNoiseOctave = PerlinNoiseTexture(width, height, octaves, powers);
+    const unsigned int width = 2048;
+    const unsigned int height = 2048;
+    std::vector<int> octaves = { 4, 8, 16, 32, 64, 128, 256, 512, 1024 };
+    std::vector<float> powers = { 1.0, 0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625, 0.0078125, 0.0078125 };
+    //ValueNoiseTexture valueNoise = ValueNoiseTexture(width, height, 10);
+	//ValueNoiseTexture valueNoiseOctave = ValueNoiseTexture(width, height, octaves, powers);
+    //PerlinNoiseTexture perlinNoise = PerlinNoiseTexture(width, height, 10);
+	//float start = glfwGetTime();
+    //PerlinNoiseTexture perlinNoiseOctave = PerlinNoiseTexture(width, height, octaves, powers);
+	//float stop = glfwGetTime();
+	//float elapsed = (stop - start) * 1000.0f;
+	//std::cout << "Perlin noise generation time: " << elapsed << " miliseconds" << std::endl;
 
     // Models & meshes
     ScreenQuad screen = ScreenQuad();
 
     std::vector<float> vertices;
-    for (unsigned int i = 0; i < height; i++)
+    for (unsigned int i = 0; i < width; i++)
     {
-        for (unsigned int j = 0; j < width; j++)
+        for (unsigned int j = 0; j < height; j++)
         {
-
-            vertices.push_back(-height / 2.0f + i); //x
+            vertices.push_back(-0.5 * width + i); //x
             vertices.push_back(0.0); //y
-            vertices.push_back(-width / 2.0f + j); //z
-			vertices.push_back((float)j / (float)width); //u
-			vertices.push_back((float)i / (float)height); //v
+            vertices.push_back(-0.5 * height + j); //z
+			vertices.push_back((float)i / (float)width); //u
+			vertices.push_back((float)j / (float)height); //v
         }
     }
 
@@ -6004,10 +6014,10 @@ int noise_scene() {
     std::vector<int> indices;
 
 
-    for (unsigned int i = 0; i < height - 1; ++i) {
-        for (unsigned int j = 0; j < width; ++j) {
-            indices.push_back(j + width * i + width);
-            indices.push_back(j + width * i);
+    for (unsigned int i = 0; i < width - 1; ++i) {
+        for (unsigned int j = 0; j < height; ++j) {
+            indices.push_back(j + height * i + height);
+            indices.push_back(j + height * i);
         }
         indices.push_back(RESTART_INDEX);
     }
@@ -6021,7 +6031,58 @@ int noise_scene() {
     terrainVAO.setAttributes(3, 0, 2, 0);
     terrainVAO.unbind();
 
+    float start = glfwGetTime();
+    FBO perlinFBO = FBO();
+    perlinFBO.bind();
+    Texture perlinNoiseGPU = Texture(width, height, GL_RGB16F, 
+        1, GL_LINEAR, GL_LINEAR, GL_REPEAT, GL_REPEAT);
+    perlinNoiseGPU.attach(GL_COLOR_ATTACHMENT0);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE);
+    glViewport(0, 0, width, height);
+    glClear(GL_COLOR_BUFFER_BIT);
+    perlinShader.use();
+    perlinShader.setVec2("resolution", glm::vec2(width, height));
+    float amplitude = 1.0f;
+    float persistence = 0.5f;
+    for (size_t i = 0; i < octaves.size(); ++i)
+    {
+        perlinShader.setInt("frequency", octaves[i]);
+        perlinShader.setFloat("amplitude", amplitude);
+
+        screen.Draw();
+
+        amplitude *= persistence; // 1.0, 0.5, 0.25, 0.125...
+    }
+    glDisable(GL_BLEND);
+    //Texture perlinGenerator = Texture(width, height, GL_RGB16F);
+    //octaves = { 16 };
+    //for (size_t i = octaves.size(); i-- > 0; ) {
+    //    glEnable(GL_BLEND);
+    //    glBlendFunc(GL_ONE, GL_ONE);
+    //    perlinGenerator.attach(GL_COLOR_ATTACHMENT0);
+    //    glViewport(0, 0, width, height);
+    //    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    //    perlinShader.use();
+    //    perlinShader.setVec2("resolution", glm::vec2(width, height));
+    //    perlinShader.setInt("scale", octaves[i]);
+    //    screen.Draw();
+	//	perlinNoiseGPU.attach(GL_COLOR_ATTACHMENT0);
+    //    glViewport(0, 0, width, height);
+	//	mixShader.use();
+    //    perlinGenerator.activate(mixShader, "texture1", 0);
+	//	perlinNoiseGPU.activate(mixShader, "texture2", 1);
+	//	mixShader.setFloat("mixValue", 0.5);
+	//	screen.Draw();
+	//}
+	perlinFBO.unbind(); 
+    float stop = glfwGetTime();
+    float elapsed = (stop - start) * 1000.0f;
+    std::cout << "Perlin noise generation time: " << elapsed << " miliseconds" << std::endl;
+
+
     // Lights
+
 
     // Render object setup
     PPO ppo = PPO(screenShader, SCR_WIDTH, SCR_HEIGHT);
@@ -6052,22 +6113,39 @@ int noise_scene() {
         glm::mat4 view = camera.GetViewMatrix();
         glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 10000.0f);
         glm::mat4 model = glm::mat4(1.0f);
-        simpleShader.use();
-        simpleShader.setMat4("model", model);
-        simpleShader.setMat4("view", view);
-        simpleShader.setMat4("projection", projection);
-		perlinNoiseOctave.activate(simpleShader, "heightmap", 0);
+        float phi = glm::radians(sun_elevation);
+        float theta = glm::radians(sun_orientation);
+        glm::vec3 sun_direction = glm::vec3(0.0) - glm::vec3(sin(phi) * cos(theta), cos(phi), sin(phi) * sin(theta));
+        terrainShader.use();
+        terrainShader.setMat4("model", model);
+        terrainShader.setMat4("view", view);
+        terrainShader.setMat4("projection", projection);
+        terrainShader.setMat3("normalMatrix", glm::mat3(glm::transpose(glm::inverse(model))));
+		terrainShader.setFloat("heightScale", 1.0/8.0);
+        terrainShader.setVec2("terrainSize", glm::vec2(width, height));
+		perlinNoiseGPU.activate(terrainShader, "heightMap", 0);
+		terrainShader.setFloat("occlusion", 1.0f);
+        terrainShader.setFloat("roughness", 0.7f);
+        terrainShader.setFloat("metalness", 0.0f);
+		terrainShader.setVec3("albedo", glm::vec3(0.5f, 0.5f, 0.5f));
+        terrainShader.setInt("numLights", 1);
+		terrainShader.setInt("lights[0].type", 1);
+        terrainShader.setVec3("lights[0].origin", sun_direction);
+        terrainShader.setVec3("lights[0].color", glm::vec3(1.0));
+        terrainShader.setVec3("camPos", camera.Position);
+        terrainShader.setFloat("time", currentFrame);
         terrainVAO.bind();
         glDrawElements(GL_TRIANGLE_STRIP, indices.size(), GL_UNSIGNED_INT, 0);
 
         // debug texture
         //screenShader.use();
-        //noise2.activate(screenShader, "screenTexture", 0);
+        //glViewport(0, 0, width, height);
+        //perlinNoiseGPU.activate(screenShader, "screenTexture", 0);
         //screen.Draw();
-        perlinShader.use();
-        perlinShader.setVec2("resolution", glm::vec2(SCR_WIDTH, SCR_HEIGHT));
-        perlinShader.setInt("scale", 10);
-        screen.Draw();
+        //perlinShader.use();
+        //perlinShader.setVec2("resolution", glm::vec2(SCR_WIDTH, SCR_HEIGHT));
+        //perlinShader.setInt("scale", 10);
+        //screen.Draw();
 
         // Swap buffers and poll for IO events
         glfwSwapBuffers(window);
@@ -6196,7 +6274,7 @@ void processInput(GLFWwindow* window)
             heightScale = 1.0f;
     }
 
-    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+    if (glfwGetKey(window, GLFW_KEY_LEFT_BRACKET) == GLFW_PRESS)
     {
         if (exposure > 0.01f) {
             exposure -= 0.005f;
@@ -6205,7 +6283,7 @@ void processInput(GLFWwindow* window)
         else
             exposure = 0.01f;
     }
-    else if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+    else if (glfwGetKey(window, GLFW_KEY_RIGHT_BRACKET) == GLFW_PRESS)
     {
         if (exposure < 100.0f) {
             exposure += 0.005f;
@@ -6213,6 +6291,43 @@ void processInput(GLFWwindow* window)
         }
         else
             exposure = 100.0f;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+    {
+        if (sun_elevation > 0.0f) {
+            sun_elevation -= 0.5f;
+            std::cout << sun_elevation << std::endl;
+        }
+        else
+            sun_elevation = -0.0f;
+    }
+    else if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+    {
+        if (sun_elevation < 180.0f) {
+            sun_elevation += 0.5f;
+            std::cout << sun_elevation << std::endl;
+        }
+        else
+            sun_elevation = 180.0f;
+    }
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+    {
+        if (sun_orientation > 0.0f) {
+            sun_orientation -= 0.5f;
+            std::cout << sun_orientation << std::endl;
+        }
+        else
+            sun_orientation = 359.5f;
+    }
+    else if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+    {
+        if (sun_orientation < 360.0f) {
+            sun_orientation += 0.5f;
+            std::cout << sun_orientation << std::endl;
+        }
+        else
+            sun_orientation = 0.5f;
     }
 }
 
@@ -6239,5 +6354,6 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-    camera.ProcessMouseScroll(static_cast<float>(yoffset));
+    //camera.ProcessMouseScroll(static_cast<float>(yoffset));
+
 }
