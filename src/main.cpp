@@ -5974,8 +5974,9 @@ int noise_scene() {
     Shader terrainShader("../../../src/shaders/terrain.vert", "../../../src/shaders/terrain.frag");
     Shader terrainHeightShader("../../../src/shaders/terrain.vert", "../../../src/shaders/height.frag");
     Shader ppfxShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
-    Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/overexposure.frag");
+    Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/screen.frag");
     Shader perlinShader("../../../src/shaders/screen.vert", "../../../src/shaders/perlin.frag");
+    Shader voronoiShader("../../../src/shaders/screen.vert", "../../../src/shaders/voronoi.frag");
     Shader mixShader("../../../src/shaders/screen.vert", "../../../src/shaders/mix.frag");
 
     // Load textures
@@ -6055,31 +6056,25 @@ int noise_scene() {
         amplitude *= persistence; // 1.0, 0.5, 0.25, 0.125...
     }
     glDisable(GL_BLEND);
-    //Texture perlinGenerator = Texture(width, height, GL_RGB16F);
-    //octaves = { 16 };
-    //for (size_t i = octaves.size(); i-- > 0; ) {
-    //    glEnable(GL_BLEND);
-    //    glBlendFunc(GL_ONE, GL_ONE);
-    //    perlinGenerator.attach(GL_COLOR_ATTACHMENT0);
-    //    glViewport(0, 0, width, height);
-    //    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    //    perlinShader.use();
-    //    perlinShader.setVec2("resolution", glm::vec2(width, height));
-    //    perlinShader.setInt("scale", octaves[i]);
-    //    screen.Draw();
-	//	perlinNoiseGPU.attach(GL_COLOR_ATTACHMENT0);
-    //    glViewport(0, 0, width, height);
-	//	mixShader.use();
-    //    perlinGenerator.activate(mixShader, "texture1", 0);
-	//	perlinNoiseGPU.activate(mixShader, "texture2", 1);
-	//	mixShader.setFloat("mixValue", 0.5);
-	//	screen.Draw();
-	//}
 	perlinFBO.unbind(); 
     float stop = glfwGetTime();
     float elapsed = (stop - start) * 1000.0f;
     std::cout << "Perlin noise generation time: " << elapsed << " miliseconds" << std::endl;
 
+
+    FBO voronoiFBO = FBO();
+    perlinFBO.bind();
+    Texture voronoiNoiseGPU = Texture(width, height, GL_RGB16F,
+        1, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
+    voronoiNoiseGPU.attach(GL_COLOR_ATTACHMENT0);
+    glViewport(0, 0, width, height);
+    glClear(GL_COLOR_BUFFER_BIT);
+    voronoiShader.use();
+    voronoiShader.setVec2("resolution", glm::vec2(width, height));
+    voronoiShader.setInt("frequency", 10);
+    voronoiShader.setFloat("amplitude", 1.0);
+    screen.Draw();
+    voronoiFBO.unbind();
 
     // Lights
 
@@ -6138,10 +6133,9 @@ int noise_scene() {
         glDrawElements(GL_TRIANGLE_STRIP, indices.size(), GL_UNSIGNED_INT, 0);
 
         // debug texture
-        //screenShader.use();
-        //glViewport(0, 0, width, height);
-        //perlinNoiseGPU.activate(screenShader, "screenTexture", 0);
-        //screen.Draw();
+        screenShader.use();
+        voronoiNoiseGPU.activate(screenShader, "screenTexture", 0);
+        screen.Draw();
         //perlinShader.use();
         //perlinShader.setVec2("resolution", glm::vec2(SCR_WIDTH, SCR_HEIGHT));
         //perlinShader.setInt("scale", 10);
