@@ -19,7 +19,7 @@ uniform vec2 terrainSize;
 void main()
 {
     float scale = terrainSize.x * heightScale;
-    TexCoords = mod(aTex + vec2(0.02 * time, 0.0), vec2(1.0));
+    TexCoords = mod(aTex + vec2(0.0 * time, 0.0), vec2(1.0));
     //vec2 sampleUV = aTex;// * ((terrainSize - 1.0) / terrainSize) + (0.5 / terrainSize);   
     float height = texture(heightMap, TexCoords).r * scale;
     vec2 grad = texture(heightMap, TexCoords).gb * heightScale * vec2(1.0, terrainSize.x/terrainSize.y);

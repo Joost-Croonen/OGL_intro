@@ -73,7 +73,7 @@ float heightmapShadow(vec2 startCoords, vec3 lightDir)
 
 	const float shadowSoftness = 2.0;
 
-    int numSteps = 64;
+    int numSteps = 32;
     float shadow = 1.0;
     vec2 currentPos = startCoords;
 	float currentHeight = texture(heightMap, currentPos).r;
@@ -82,6 +82,7 @@ float heightmapShadow(vec2 startCoords, vec3 lightDir)
 	vec3 rayStep = lightDir * stepSize;
 	float deltaHeight = rayStep.y / heightScale;
     vec2 rayUV = rayStep.xz;
+	float oldHeightDiff = 0.01;
 
     for (int i = 0; i < numSteps; i++) {
         currentPos += rayUV;
@@ -93,7 +94,6 @@ float heightmapShadow(vec2 startCoords, vec3 lightDir)
 
         float texHeight = texture(heightMap, currentPos).r;
 
-        // Compare world height against world height directly
 		float heightDiff = texHeight - currentHeight;
         if (heightDiff > 0.0) {
 			float travelDist = float(i + 1) * stepSize;
@@ -105,6 +105,10 @@ float heightmapShadow(vec2 startCoords, vec3 lightDir)
                 break;
             }
         }
+		//stepSize = 0.1 * heightDiff; 
+		//vec3 rayStep = lightDir * stepSize;
+		//float deltaHeight = rayStep.y / heightScale;
+		//vec2 rayUV = rayStep.xz;
     }
     return shadow;
 }
@@ -178,6 +182,7 @@ void main()
 		vec3 diffuse = kD * Albedo / PI;
 		
 		float shadow = heightmapShadow(TexCoords, L);
+		//shadow = 1.0;
 
 		Lo += shadow * (diffuse + specular) * radiance * attenuation * NdotL;
 		//test = vec3(NdotL, 10 * specular.x, 0.0);

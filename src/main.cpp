@@ -5977,7 +5977,7 @@ int noise_scene() {
     Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/screen.frag");
     Shader perlinShader("../../../src/shaders/screen.vert", "../../../src/shaders/perlin.frag");
     Shader voronoiShader("../../../src/shaders/screen.vert", "../../../src/shaders/voronoi.frag");
-    Shader mixShader("../../../src/shaders/screen.vert", "../../../src/shaders/mix.frag");
+    Shader phacelleShader("../../../src/shaders/screen.vert", "../../../src/shaders/phacelle.frag");
 
     // Load textures
     // Texture heightmap("../../../src/textures/iceland_heightmap.png", false);
@@ -6063,7 +6063,7 @@ int noise_scene() {
 
 
     FBO voronoiFBO = FBO();
-    perlinFBO.bind();
+    voronoiFBO.bind();
     Texture voronoiNoiseGPU = Texture(width, height, GL_RGB16F,
         1, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
     voronoiNoiseGPU.attach(GL_COLOR_ATTACHMENT0);
@@ -6075,6 +6075,20 @@ int noise_scene() {
     voronoiShader.setFloat("amplitude", 1.0);
     screen.Draw();
     voronoiFBO.unbind();
+
+    FBO phacelleFBO = FBO();
+    phacelleFBO.bind();
+    Texture phacelleNoiseGPU = Texture(width, height, GL_RGB16F,
+        1, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
+    phacelleNoiseGPU.attach(GL_COLOR_ATTACHMENT0);
+    glViewport(0, 0, width, height);
+    glClear(GL_COLOR_BUFFER_BIT);
+    phacelleShader.use();
+    phacelleShader.setVec2("resolution", glm::vec2(width, height));
+    phacelleShader.setInt("frequency", 10);
+    phacelleShader.setFloat("amplitude", 1.0);
+    screen.Draw();
+    phacelleFBO.unbind();
 
     // Lights
 
@@ -6133,13 +6147,14 @@ int noise_scene() {
         glDrawElements(GL_TRIANGLE_STRIP, indices.size(), GL_UNSIGNED_INT, 0);
 
         // debug texture
-        screenShader.use();
-        voronoiNoiseGPU.activate(screenShader, "screenTexture", 0);
-        screen.Draw();
+        //screenShader.use();
+        //phacelleNoiseGPU.activate(screenShader, "screenTexture", 0);
+        //screen.Draw();
         //perlinShader.use();
         //perlinShader.setVec2("resolution", glm::vec2(SCR_WIDTH, SCR_HEIGHT));
         //perlinShader.setInt("scale", 10);
         //screen.Draw();
+
 
         // Swap buffers and poll for IO events
         glfwSwapBuffers(window);
@@ -6150,11 +6165,519 @@ int noise_scene() {
     return 0;
 }
 
+int random_terrain_scene() {
+    // Variable setup
+    const unsigned int MS_SAMPLES = 1;
+    float gamma = 2.2;      // best to use 2.2
+    bool manual_gamma = true;
+    bool gamma_correct = (gamma != 1.0);
 
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, MS_SAMPLES);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+    int fbWidth, fbHeight;
+    glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+
+    // OGL state setup --------------------------------------------------
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    //glEnable(GL_BLEND);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    if (MS_SAMPLES > 1) glEnable(GL_MULTISAMPLE);
+
+    if (gamma_correct && !manual_gamma) glEnable(GL_FRAMEBUFFER_SRGB);
+
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+    const unsigned int RESTART_INDEX = 0xFFFFFFFF;
+    glEnable(GL_PRIMITIVE_RESTART);
+    glPrimitiveRestartIndex(RESTART_INDEX);
+
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+
+    // Setup geometry, textures, buffers and shaders --------------------
+    // Vertices
+
+    // Shaders
+    Shader terrainShader("../../../src/shaders/terrain.vert", "../../../src/shaders/terrain.frag");
+    Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/overexposure.frag");
+    Shader noiseShader("../../../src/shaders/screen.vert", "../../../src/shaders/noise.frag");
+
+    // Load textures
+    // Texture heightmap("../../../src/textures/iceland_heightmap.png", false);
+    const unsigned int width = 2048;
+    const unsigned int height = 2048;
+    std::vector<int> octaves = { 4, 8, 16, 32, 64, 128, 256, 512, 1024 };
+    std::vector<float> powers = { 1.0, 0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625, 0.0078125, 0.0078125 };
+
+    // Models & meshes
+    ScreenQuad screen = ScreenQuad();
+
+    std::vector<float> vertices;
+    for (unsigned int i = 0; i < width; i++)
+    {
+        for (unsigned int j = 0; j < height; j++)
+        {
+            vertices.push_back(-0.5 * width + i); //x
+            vertices.push_back(0.0); //y
+            vertices.push_back(-0.5 * height + j); //z
+            vertices.push_back((float)i / (float)width); //u
+            vertices.push_back((float)j / (float)height); //v
+        }
+    }
+    
+    const unsigned int NUM_STRIPS = height - 1;
+    const unsigned int NUM_VERTS_PER_STRIP = width * 2;
+    std::vector<int> indices;
+    
+    
+    for (unsigned int i = 0; i < width - 1; ++i) {
+        for (unsigned int j = 0; j < height; ++j) {
+            indices.push_back(j + height * i + height);
+            indices.push_back(j + height * i);
+        }
+        indices.push_back(RESTART_INDEX);
+    }
+    
+    VAO terrainVAO = VAO();
+    terrainVAO.bind();
+    VBO terrainVBO = VBO(vertices);
+    terrainVAO.linkVBO(terrainVBO);
+    EBO terrainEBO = EBO(indices);
+    terrainVAO.linkEBO(terrainEBO);
+    terrainVAO.setAttributes(3, 0, 2, 0);
+    terrainVAO.unbind();
+
+    FBO phacelleFBO = FBO();
+    phacelleFBO.bind();
+    Texture phacelleNoiseGPU = Texture(width, height, GL_RGB16F,
+        1, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
+    phacelleNoiseGPU.attach(GL_COLOR_ATTACHMENT0);
+    phacelleFBO.check_status();
+    phacelleFBO.unbind();
+
+    // Lights
+
+
+    // Render object setup
+    PPO ppo = PPO(screenShader, SCR_WIDTH, SCR_HEIGHT);
+
+    // shader setup
+
+    // Background
+    float clear_color[] = { pow(0.1, gamma), pow(0.1, gamma), pow(0.1, gamma), 1.0 };
+
+
+    bool toggle_old = toggle;
+    int caseNr = 0;
+
+    // Main render loop ---------------------------------------------------
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+        phacelleFBO.bind();
+        glViewport(0, 0, width, height);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        noiseShader.use();
+        noiseShader.setVec2("resolution", glm::vec2(width, height));
+        noiseShader.setInt("frequency", 48);
+        noiseShader.setFloat("amplitude", 1.0);
+        if (toggle != toggle_old) {
+            caseNr = ((caseNr + 1) % (4 + 1));
+            std::cout << caseNr << std::endl;
+            toggle_old = toggle;
+        }
+        noiseShader.setInt("octaves", caseNr);
+        noiseShader.setFloat("time", currentFrame);
+        screen.Draw();
+        phacelleFBO.unbind();
+
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 10000.0f);
+        glm::mat4 model = glm::mat4(1.0f);
+        float phi = glm::radians(sun_elevation);
+        float theta = glm::radians(sun_orientation);
+        glm::vec3 sun_direction = glm::vec3(0.0) - glm::vec3(sin(phi) * cos(theta), cos(phi), sin(phi) * sin(theta));
+        terrainShader.use();
+        terrainShader.setMat4("model", model);
+        terrainShader.setMat4("view", view);
+        terrainShader.setMat4("projection", projection);
+        terrainShader.setMat3("normalMatrix", glm::mat3(glm::transpose(glm::inverse(model))));
+        terrainShader.setFloat("heightScale", 1.0 / 6.0);
+        terrainShader.setVec2("terrainSize", glm::vec2(width, height));
+        phacelleNoiseGPU.activate(terrainShader, "heightMap", 0);
+        terrainShader.setFloat("occlusion", 1.0f);
+        terrainShader.setFloat("roughness", 0.7f);
+        terrainShader.setFloat("metalness", 0.0f);
+        terrainShader.setVec3("albedo", glm::vec3(0.5f, 0.5f, 0.5f));
+        terrainShader.setInt("numLights", 1);
+        terrainShader.setInt("lights[0].type", 1);
+        terrainShader.setVec3("lights[0].origin", sun_direction);
+        terrainShader.setVec3("lights[0].color", glm::vec3(1.0));
+        terrainShader.setVec3("camPos", camera.Position);
+        terrainShader.setFloat("time", 0);
+        terrainVAO.bind();
+        glDrawElements(GL_TRIANGLE_STRIP, indices.size(), GL_UNSIGNED_INT, 0);
+
+        // debug texture
+        screenShader.use();
+        phacelleNoiseGPU.activate(screenShader, "screenTexture", 0);
+        //screen.Draw();
+        //perlinShader.use();
+        //perlinShader.setVec2("resolution", glm::vec2(SCR_WIDTH, SCR_HEIGHT));
+        //perlinShader.setInt("scale", 10);
+        //screen.Draw();
+        
+
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Terminate
+    glfwTerminate();
+    return 0;
+}
+
+int grass_scene() {
+    // Variable setup
+    const unsigned int MS_SAMPLES = 1;
+    float gamma = 2.2;      // best to use 2.2
+    bool manual_gamma = true;
+    bool gamma_correct = (gamma != 1.0);
+
+    // Initialse GLFW
+    glfwInit();
+
+    // Setup GLFW hints
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_SAMPLES, MS_SAMPLES);
+
+    // Create and verify window 
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+    int fbWidth, fbHeight;
+    glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    // Set context to current window
+    glfwMakeContextCurrent(window);
+
+    // Intitialise and verify GLAD
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialise GLAD" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Handle resizing of viewport
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    // Enable mouse inputs
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+
+
+    // OGL state setup --------------------------------------------------
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+
+    //glEnable(GL_STENCIL_TEST);
+    //glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    //glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    //glEnable(GL_BLEND);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    if (MS_SAMPLES > 1) glEnable(GL_MULTISAMPLE);
+
+    if (gamma_correct && !manual_gamma) glEnable(GL_FRAMEBUFFER_SRGB);
+
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+    const unsigned int RESTART_INDEX = 0xFFFFFFFF;
+    glEnable(GL_PRIMITIVE_RESTART);
+    glPrimitiveRestartIndex(RESTART_INDEX);
+
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+
+    // Setup geometry, textures, buffers and shaders --------------------
+    // Vertices
+
+    // Shaders
+    Shader terrainShader("../../../src/shaders/terrain.vert", "../../../src/shaders/terrain.frag");
+    Shader terrainHeightShader("../../../src/shaders/terrain.vert", "../../../src/shaders/height.frag");
+    Shader ppfxShader("../../../src/shaders/screen.vert", "../../../src/shaders/ppfx.frag");
+    Shader screenShader("../../../src/shaders/screen.vert", "../../../src/shaders/screen.frag");
+    Shader perlinShader("../../../src/shaders/screen.vert", "../../../src/shaders/perlin.frag");
+    Shader voronoiShader("../../../src/shaders/screen.vert", "../../../src/shaders/voronoi.frag");
+    Shader phacelleShader("../../../src/shaders/screen.vert", "../../../src/shaders/phacelle.frag");
+    Shader simpleShader("../../../src/shaders/simple.vert", "../../../src/shaders/solid.frag");
+
+    // Load textures
+    // Texture heightmap("../../../src/textures/iceland_heightmap.png", false);
+    const unsigned int width = 2048;
+    const unsigned int height = 2048;
+    std::vector<int> octaves = { 4, 8, 16, 32, 64, 128, 256, 512, 1024 };
+    std::vector<float> powers = { 1.0, 0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625, 0.0078125, 0.0078125 };
+    //ValueNoiseTexture valueNoise = ValueNoiseTexture(width, height, 10);
+    //ValueNoiseTexture valueNoiseOctave = ValueNoiseTexture(width, height, octaves, powers);
+    //PerlinNoiseTexture perlinNoise = PerlinNoiseTexture(width, height, 10);
+    //float start = glfwGetTime();
+    //PerlinNoiseTexture perlinNoiseOctave = PerlinNoiseTexture(width, height, octaves, powers);
+    //float stop = glfwGetTime();
+    //float elapsed = (stop - start) * 1000.0f;
+    //std::cout << "Perlin noise generation time: " << elapsed << " miliseconds" << std::endl;
+
+    // Models & meshes
+    ScreenQuad screen = ScreenQuad();
+
+    Model grass("../../../src/models/grass_blade/grass_blade.obj", gamma_correct);
+
+    std::vector<float> vertices;
+    for (unsigned int i = 0; i < width; i++)
+    {
+        for (unsigned int j = 0; j < height; j++)
+        {
+            vertices.push_back(-0.5 * width + i); //x
+            vertices.push_back(0.0); //y
+            vertices.push_back(-0.5 * height + j); //z
+            vertices.push_back((float)i / (float)width); //u
+            vertices.push_back((float)j / (float)height); //v
+        }
+    }
+
+    const unsigned int NUM_STRIPS = height - 1;
+    const unsigned int NUM_VERTS_PER_STRIP = width * 2;
+    std::vector<int> indices;
+
+
+    for (unsigned int i = 0; i < width - 1; ++i) {
+        for (unsigned int j = 0; j < height; ++j) {
+            indices.push_back(j + height * i + height);
+            indices.push_back(j + height * i);
+        }
+        indices.push_back(RESTART_INDEX);
+    }
+
+    VAO terrainVAO = VAO();
+    terrainVAO.bind();
+    VBO terrainVBO = VBO(vertices);
+    terrainVAO.linkVBO(terrainVBO);
+    EBO terrainEBO = EBO(indices);
+    terrainVAO.linkEBO(terrainEBO);
+    terrainVAO.setAttributes(3, 0, 2, 0);
+    terrainVAO.unbind();
+
+    float start = glfwGetTime();
+    FBO perlinFBO = FBO();
+    perlinFBO.bind();
+    Texture perlinNoiseGPU = Texture(width, height, GL_RGB16F,
+        1, GL_LINEAR, GL_LINEAR, GL_REPEAT, GL_REPEAT);
+    perlinNoiseGPU.attach(GL_COLOR_ATTACHMENT0);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE);
+    glViewport(0, 0, width, height);
+    glClear(GL_COLOR_BUFFER_BIT);
+    perlinShader.use();
+    perlinShader.setVec2("resolution", glm::vec2(width, height));
+    float amplitude = 1.0f;
+    float persistence = 0.3f;
+    for (size_t i = 0; i < octaves.size(); ++i)
+    {
+        perlinShader.setInt("frequency", octaves[i]);
+        perlinShader.setFloat("amplitude", amplitude);
+
+        screen.Draw();
+
+        amplitude *= persistence; // 1.0, 0.5, 0.25, 0.125...
+    }
+    glDisable(GL_BLEND);
+    perlinFBO.unbind();
+    float stop = glfwGetTime();
+    float elapsed = (stop - start) * 1000.0f;
+    std::cout << "Perlin noise generation time: " << elapsed << " miliseconds" << std::endl;
+
+
+    FBO voronoiFBO = FBO();
+    voronoiFBO.bind();
+    Texture voronoiNoiseGPU = Texture(width, height, GL_RGB16F,
+        1, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
+    voronoiNoiseGPU.attach(GL_COLOR_ATTACHMENT0);
+    glViewport(0, 0, width, height);
+    glClear(GL_COLOR_BUFFER_BIT);
+    voronoiShader.use();
+    voronoiShader.setVec2("resolution", glm::vec2(width, height));
+    voronoiShader.setInt("frequency", 10);
+    voronoiShader.setFloat("amplitude", 1.0);
+    screen.Draw();
+    voronoiFBO.unbind();
+
+    FBO phacelleFBO = FBO();
+    phacelleFBO.bind();
+    Texture phacelleNoiseGPU = Texture(width, height, GL_RGB16F,
+        1, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
+    phacelleNoiseGPU.attach(GL_COLOR_ATTACHMENT0);
+    glViewport(0, 0, width, height);
+    glClear(GL_COLOR_BUFFER_BIT);
+    phacelleShader.use();
+    phacelleShader.setVec2("resolution", glm::vec2(width, height));
+    phacelleShader.setInt("frequency", 10);
+    phacelleShader.setFloat("amplitude", 1.0);
+    screen.Draw();
+    phacelleFBO.unbind();
+
+    // Lights
+
+
+    // Render object setup
+    PPO ppo = PPO(screenShader, SCR_WIDTH, SCR_HEIGHT);
+
+    // shader setup
+
+    // Background
+    float clear_color[] = { pow(0.1, gamma), pow(0.1, gamma), pow(0.1, gamma), 1.0 };
+
+
+    bool toggle_old = toggle;
+    int caseNr = 0;
+
+    // Main render loop ---------------------------------------------------
+    while (!glfwWindowShouldClose(window))
+    {
+        // frame time
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // Inputs
+        processInput(window);
+
+        // Rendering
+        glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 10000.0f);
+        glm::mat4 model = glm::mat4(1.0f);
+        float phi = glm::radians(sun_elevation);
+        float theta = glm::radians(sun_orientation);
+        glm::vec3 sun_direction = glm::vec3(0.0) - glm::vec3(sin(phi) * cos(theta), cos(phi), sin(phi) * sin(theta));
+        terrainShader.use();
+        terrainShader.setMat4("model", model);
+        terrainShader.setMat4("view", view);
+        terrainShader.setMat4("projection", projection);
+        terrainShader.setMat3("normalMatrix", glm::mat3(glm::transpose(glm::inverse(model))));
+        terrainShader.setFloat("heightScale", 1.0 / 24.0);
+        terrainShader.setVec2("terrainSize", glm::vec2(width, height));
+        perlinNoiseGPU.activate(terrainShader, "heightMap", 0);
+        terrainShader.setFloat("occlusion", 1.0f);
+        terrainShader.setFloat("roughness", 0.7f);
+        terrainShader.setFloat("metalness", 0.0f);
+        terrainShader.setVec3("albedo", glm::vec3(0.5f, 0.5f, 0.5f));
+        terrainShader.setInt("numLights", 1);
+        terrainShader.setInt("lights[0].type", 1);
+        terrainShader.setVec3("lights[0].origin", sun_direction);
+        terrainShader.setVec3("lights[0].color", glm::vec3(1.0));
+        terrainShader.setVec3("camPos", camera.Position);
+        terrainShader.setFloat("time", currentFrame);
+        terrainVAO.bind();
+        glDrawElements(GL_TRIANGLE_STRIP, indices.size(), GL_UNSIGNED_INT, 0);
+
+        simpleShader.use();
+        model = glm::scale(model, glm::vec3(10.0));
+        simpleShader.setMat4("model", model);
+        simpleShader.setMat4("view", view);
+        simpleShader.setMat4("projection", projection);
+        simpleShader.setVec3("color", glm::vec3(0.05, 0.2, 0.1));
+        grass.Draw(simpleShader);
+
+
+        // debug texture
+        //screenShader.use();
+        //phacelleNoiseGPU.activate(screenShader, "screenTexture", 0);
+        //screen.Draw();
+        //perlinShader.use();
+        //perlinShader.setVec2("resolution", glm::vec2(SCR_WIDTH, SCR_HEIGHT));
+        //perlinShader.setInt("scale", 10);
+        //screen.Draw();
+
+
+        // Swap buffers and poll for IO events
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    };
+    // Terminate
+    glfwTerminate();
+    return 0;
+}
 
 int main(void)
 {
-    switch (26)
+    switch (28)
     {
     case 0:  return base_scene(); break;
     case 1:  return main_scene(); break;
@@ -6183,6 +6706,8 @@ int main(void)
     case 24: return terrain_scene(); break;
     case 25: return tesselation_scene(); break;
     case 26: return noise_scene(); break;
+    case 27: return random_terrain_scene(); break;
+    case 28: return grass_scene(); break;
     }
 }
 
