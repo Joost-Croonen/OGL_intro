@@ -193,8 +193,8 @@ void main()
 	vec3 ambient = vec3(0.01, 0.01, 0.03) * Albedo * occlusion;
 	vec3 color = Lo + ambient;
 
-	color = color / (color + vec3(1.0));		// tone mapping
-	color = pow(color, vec3(1.0/2.2));			// gamma correction
+	//color = color / (color + vec3(1.0));		// tone mapping
+	//color = pow(color, vec3(1.0/2.2));			// gamma correction
 	test = N;
 
 	//test = vec3(0.0);

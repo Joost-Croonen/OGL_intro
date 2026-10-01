@@ -33,9 +33,11 @@ public:
     Texture depthTexture;
     Shader screenShader;
     Shader bloomShader;
+    Shader bloomExtractShader;
     PPO(Shader shader, int width, int height, int num_samples=1):
         screenShader(shader),
         bloomShader(Shader("../../../src/shaders/screen.vert", "../../../src/shaders/bloom.frag")),
+        bloomExtractShader(Shader("../../../src/shaders/screen.vert", "../../../src/shaders/bloom_seperation.frag")),
         width(width),
         height(height),
         multisampling(num_samples>1),
@@ -121,12 +123,22 @@ public:
         vao.unbind();
     }
 
-    void bloom() {
-        renderBuffer.bind();
-        renderBuffer.set_read_buffer(GL_COLOR_ATTACHMENT1);
-        renderBuffer.blit(width, height, pingBuffer.id);
-        renderBuffer.set_read_buffer(GL_COLOR_ATTACHMENT0);
-        unsigned int amount = 5;
+    void bloom(bool auto_extract = false) {
+        //glDisable(GL_DEPTH_TEST);
+        if (auto_extract) {
+            pingBuffer.bind();
+            bloomExtractShader.use();
+            renderTexture.activate(bloomExtractShader, "image", 0);
+            vao.bind();
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        }
+        else{
+            renderBuffer.bind();
+            renderBuffer.set_read_buffer(GL_COLOR_ATTACHMENT1);
+            renderBuffer.blit(width, height, pingBuffer.id);
+            renderBuffer.set_read_buffer(GL_COLOR_ATTACHMENT0);
+        }
+        unsigned int amount = 8;
         bloomShader.use();
         for (unsigned int i = 0; i < amount; i++)
         {
@@ -143,6 +155,7 @@ public:
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         }
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        //glDisable(GL_DEPTH_TEST);
     }
 
     void Delete() {

@@ -13,7 +13,7 @@ const float factorR = 1.0;
 const float factorM = 1.0;
 const float factorO = 1.0;
 
-const int NUMSTEPS = 32;
+const int NUMSTEPS = 128;
 
 const vec3 rayleighScatter = factorR * vec3(5.8e-3, 13.5e-3, 33.1e-3);
 const vec3 mieScatter = factorM * vec3(4.0e-3);

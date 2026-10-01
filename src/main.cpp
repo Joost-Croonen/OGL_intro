@@ -6941,7 +6941,7 @@ int planet_atmosphere_scene(){
         glFrontFace(GL_CCW);
         glDisable(GL_BLEND);
 
-        if (bloom) ppo.bloom();
+        if (bloom) ppo.bloom(true);
         ppfxShader.use();
         ppfxShader.setFloat("gamma", gamma);
         ppfxShader.setFloat("exposure", exposure);
@@ -7052,6 +7052,8 @@ int grass_scene() {
     Shader voronoiShader("../../../src/shaders/screen.vert", "../../../src/shaders/voronoi.frag");
     Shader phacelleShader("../../../src/shaders/screen.vert", "../../../src/shaders/phacelle.frag");
     Shader grassShader("../../../src/shaders/grass.vert", "../../../src/shaders/grass.frag");
+    Shader skyShader("../../../src/shaders/sky_atmosphere_cube.vert", "../../../src/shaders/sky_atmosphere.frag");
+    Shader skyLUTShader("../../../src/shaders/screen.vert", "../../../src/shaders/sky_atmosphere_LUT.frag");
     Shader simpleShader("../../../src/shaders/simple.vert", "../../../src/shaders/solid.frag");
 
     // Load textures
@@ -7064,7 +7066,7 @@ int grass_scene() {
     // Models & meshes
     ScreenQuad screen = ScreenQuad();
     std::vector<TextureData> texData = {};
-    Model quad = Model(Cube(glm::vec3(1.0), 1.0, texData));
+    Model cube = Model(Cube(glm::vec3(1.0), 1.0, texData));
 
     Model grassHi("../../../src/models/grass_blade/grass_blade_long_hi.obj", gamma_correct);
     Model grassLo("../../../src/models/grass_blade/grass_blade_long_lo.obj", gamma_correct);
@@ -7162,11 +7164,30 @@ int grass_scene() {
     screen.Draw();
     phacelleFBO.unbind();
 
+    start = glfwGetTime();
+    const float LUTwidht = 512;
+    const float LUTheight = 512;
+    FBO skyLutFBO = FBO();
+    skyLutFBO.bind();
+    Texture skyAtmosphereLUT = Texture(LUTwidht, LUTheight, GL_RGB16F,
+        1, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
+    skyAtmosphereLUT.attach(GL_COLOR_ATTACHMENT0);
+    skyLutFBO.check_status();
+    glViewport(0, 0, LUTwidht, LUTheight);
+    glClear(GL_COLOR_BUFFER_BIT);
+    skyLUTShader.use();
+    screen.Draw();
+    skyLutFBO.unbind();
+    stop = glfwGetTime();
+    elapsed = (stop - start) * 1000.0f;
+    std::cout << "Atmospheric LUT generation time: " << elapsed << " miliseconds" << std::endl;
+
+
     // Lights
 
 
     // Render object setup
-    PPO ppo = PPO(screenShader, SCR_WIDTH, SCR_HEIGHT);
+    PPO ppo = PPO(ppfxShader, SCR_WIDTH, SCR_HEIGHT);
 
     // shader setup
 
@@ -7190,6 +7211,7 @@ int grass_scene() {
         processInput(window);
 
         // Rendering
+        ppo.start_render_to_texture();
         glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glm::mat4 view = camera.GetViewMatrix();
@@ -7206,10 +7228,10 @@ int grass_scene() {
         terrainShader.setFloat("heightScale", 1.0 / 24.0);
         terrainShader.setVec2("terrainSize", glm::vec2(width, height));
         perlinNoiseGPU.activate(terrainShader, "heightMap", 0);
-        terrainShader.setFloat("occlusion", 0.01f);
+        terrainShader.setFloat("occlusion", 0.05f);
         terrainShader.setFloat("roughness", 1.0f);
         terrainShader.setFloat("metalness", 0.0f);
-        terrainShader.setVec3("albedo", glm::vec3(0.0075f, 0.005f, 0.0005f));
+        terrainShader.setVec3("albedo", glm::vec3(0.012, 0.04, 0.004));
         terrainShader.setInt("numLights", 1);
         terrainShader.setInt("lights[0].type", 1);
         terrainShader.setVec3("lights[0].origin", sun_direction);
@@ -7255,6 +7277,27 @@ int grass_scene() {
             }
         }
         glEnable(GL_CULL_FACE);
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+        glFrontFace(GL_CW);
+        skyShader.use();
+        skyShader.setMat4("view", view);
+        skyShader.setMat4("projection", projection);
+        skyShader.setVec3("sunDir", sun_direction);
+        skyShader.setVec3("camPos", glm::vec3(0.0));
+        skyShader.setVec3("planetPos", glm::vec3(0.0, -6371.0, 0.0));
+        skyAtmosphereLUT.activate(skyShader, "atmosphereLUT", 0);
+        cube.Draw(skyShader);
+        glFrontFace(GL_CCW);
+        glDisable(GL_BLEND);
+
+        if (bloom) ppo.bloom(true);
+        ppfxShader.use();
+        ppfxShader.setFloat("gamma", gamma);
+        ppfxShader.setFloat("exposure", exposure);
+        ppfxShader.setFloat("bloom", bloom);
+        ppo.draw_texture_to_screen();
 
         //simpleShader.use();
         //model = glm::scale(model, glm::vec3(100.0, 10.0, 10.0));

@@ -236,8 +236,9 @@ void main()
 	Lo += ambient;
 
 	vec3 color = Lo;
-	color = color / (color + vec3(1.0));		// tone mapping
-	color = pow(color, vec3(1.0/2.2));			// gamma correction
+	//color = color / (color + vec3(1.0));		// tone mapping
+	//color = pow(color, vec3(1.0/2.2));			// gamma correction
+	
 	//test = N.yxz;
 	//test = U * 0.5 + 0.5;
     //float dist = length(camPos - WorldPos);
