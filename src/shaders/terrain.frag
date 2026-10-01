@@ -181,7 +181,7 @@ void main()
 
 		vec3 diffuse = kD * Albedo / PI;
 		
-		float shadow = heightmapShadow(TexCoords, L);
+		float shadow = occlusion * heightmapShadow(TexCoords, L);
 		//shadow = 1.0;
 
 		Lo += shadow * (diffuse + specular) * radiance * attenuation * NdotL;
@@ -197,6 +197,7 @@ void main()
 	color = pow(color, vec3(1.0/2.2));			// gamma correction
 	test = N;
 
+	//test = vec3(0.0);
 	FragColor = vec4(color, 1.0);
 	//FragColor = vec4(test, 1.0);
 }

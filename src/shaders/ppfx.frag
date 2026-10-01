@@ -59,6 +59,7 @@ vec4 exposureToneMappingColor(vec4 input_color)
 vec4 gammaColor(vec4 input_color)
 {                                                                                                                                                                                   
     //vec4 screenColor = texture(screenTexture, TexCoords);
+    float test = gamma;
     return vec4(pow(input_color.rgb, vec3(1.0/gamma)), 1.0);
 }
 
@@ -122,6 +123,7 @@ void main()
     FragColor = vec4(texture(screenTexture, TexCoords).rgb, 1.0);
     FragColor = bloom? bloomColor(): FragColor;
     FragColor = exposureToneMappingColor(FragColor);
+    //FragColor = reinhardToneMappingColor(FragColor);
     FragColor = gammaColor(FragColor);
     //FragColor = vec4(texture(bloomTexture, TexCoords).rgb, 1.0);
     //FragColor = grayScaleColor();

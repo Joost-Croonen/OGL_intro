@@ -23,9 +23,9 @@ public:
 			textures_loaded.push_back(mesh.textures[i]);
 		directory = "";
 	}
-	void Draw(Shader &shader){
+	void Draw(Shader &shader, unsigned int instanceAmount=1){
 		for (unsigned int i = 0; i < meshes.size(); i++) {
-			meshes[i].Draw(shader);
+			meshes[i].Draw(shader, instanceAmount);
 		}
 	}
 	void Delete() const {

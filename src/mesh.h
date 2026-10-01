@@ -34,7 +34,7 @@ public:
         setup_mesh();
     }
 
-    void Draw(Shader& shader) {
+    void Draw(Shader& shader, unsigned int instanceAmount=1) {
         unsigned int diffuseNr = 1;
         unsigned int specularNr = 1;
         unsigned int normalNr = 1;
@@ -59,7 +59,12 @@ public:
 
         // Draw mesh
         glBindVertexArray(VAOid);
-        glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+        if (instanceAmount == 1){ 
+            glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0); 
+        }
+        else {
+            glDrawElementsInstanced(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0, instanceAmount);
+        }
         glBindVertexArray(0);           // unbind
     }
     void Delete() const {
